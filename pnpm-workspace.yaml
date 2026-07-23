@@ -1,2 +1,2 @@
-allowBuilds:
-  '@shopify/react-native-skia': set this to true or false
+onlyBuiltDependencies:
+  - '@shopify/react-native-skia'
