@@ -6,7 +6,7 @@ import { chipColors, colors } from './theme';
 export function formatMoney(value: number, signed = false) {
   const rounded = Math.round(value);
   const prefix = signed && rounded > 0 ? '+' : '';
-  return `${prefix}${rounded.toLocaleString()}`;
+  return `${prefix}$${rounded.toLocaleString()}`;
 }
 
 export function Money({ value, signed = false, style }: { value: number; signed?: boolean; style?: object }) {

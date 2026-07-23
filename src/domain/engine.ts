@@ -109,7 +109,7 @@ export function resizeWager(state: GameState, id: string, amount: number, option
     return { state, error: 'Don’t contract wagers may be reduced, never increased.' };
   }
   if (current.contract && ['dontPass', 'dontCome'].includes(current.kind) && amount < current.amount) {
-    if (!Number.isInteger(amount) || amount < state.ruleset.tableMinimum) return { state, error: `Minimum is ${state.ruleset.tableMinimum}.` };
+    if (!Number.isInteger(amount) || amount < state.ruleset.tableMinimum) return { state, error: `Minimum is $${state.ruleset.tableMinimum}.` };
     const next = cloneState(state);
     const wager = next.wagers.find((candidate) => candidate.id === id)!;
     next.bankroll += wager.amount - amount;

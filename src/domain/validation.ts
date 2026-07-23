@@ -53,11 +53,11 @@ export function validateBet(state: GameState, request: BetRequest, options: BetV
     const isProp = PROP_KINDS.includes(request.kind);
     const minimum = isProp ? 1 : state.ruleset.tableMinimum;
     if (request.amount < minimum) {
-      return { valid: false, message: `Minimum is ${minimum}.`, nearestValidAmount: minimum };
+      return { valid: false, message: `Minimum is $${minimum}.`, nearestValidAmount: minimum };
     }
   }
   if (request.amount > state.ruleset.tableMaximum) {
-    return { valid: false, message: `Maximum is ${state.ruleset.tableMaximum}.` };
+    return { valid: false, message: `Maximum is $${state.ruleset.tableMaximum}.` };
   }
 
   if ((request.kind === 'pass' || request.kind === 'dontPass') && state.phase !== 'comeOut') {
@@ -87,7 +87,7 @@ export function validateBet(state: GameState, request: BetRequest, options: BetV
     const max = request.kind === 'dontOdds' || request.kind === 'dontComeOdds'
       ? parent.amount * state.ruleset.dontOddsMultiple
       : parent.amount * state.ruleset.passOddsMultiples[point];
-    if (request.amount > max) return { valid: false, message: `Maximum odds are ${max}.` };
+    if (request.amount > max) return { valid: false, message: `Maximum odds are $${max}.` };
   }
 
   if ((request.kind === 'pass' || request.kind === 'dontPass') && state.wagers.some((wager) => wager.kind === request.kind)) {
@@ -99,7 +99,7 @@ export function validateBet(state: GameState, request: BetRequest, options: BetV
     if (request.amount % unit !== 0) {
       return {
         valid: false,
-        message: `Use a ${unit} betting unit for an exact payout.`,
+        message: `Use a $${unit} betting unit for an exact payout.`,
         nearestValidAmount: nearestMultiple(request.amount, unit, state.ruleset.tableMinimum),
       };
     }
@@ -112,11 +112,11 @@ export function validateWagerForRoll(state: GameState, wager: Wager): Validation
     return { valid: false, message: 'Bet must be a positive whole-dollar amount.' };
   }
   if (wager.amount > state.ruleset.tableMaximum) {
-    return { valid: false, message: `Maximum is ${state.ruleset.tableMaximum}.` };
+    return { valid: false, message: `Maximum is $${state.ruleset.tableMaximum}.` };
   }
   const unit = requiredUnit(wager, state);
   if (wager.amount % unit !== 0) {
-    return { valid: false, message: `Use a ${unit} betting unit for an exact payout.` };
+    return { valid: false, message: `Use a $${unit} betting unit for an exact payout.` };
   }
   if (wager.parentId) {
     const parent = state.wagers.find((candidate) => candidate.id === wager.parentId);
@@ -127,7 +127,7 @@ export function validateWagerForRoll(state: GameState, wager: Wager): Validation
     const max = wager.kind === 'dontOdds' || wager.kind === 'dontComeOdds'
       ? parent.amount * state.ruleset.dontOddsMultiple
       : parent.amount * state.ruleset.passOddsMultiples[point];
-    if (wager.amount > max) return { valid: false, message: `Maximum odds are ${max}.` };
+    if (wager.amount > max) return { valid: false, message: `Maximum odds are $${max}.` };
   }
   return { valid: true };
 }

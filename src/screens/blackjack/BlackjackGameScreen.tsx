@@ -149,7 +149,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
     applyStep(next);
     const nextUnits = unitsForStep(current.bettingStrategy, next, current.progressionMaxUnits);
     const nextBet = progressionBet(nextUnits, state.rules, state.bankroll);
-    if (roundProfit === 0) return `Push — next bet unchanged (${nextBet}).`;
+    if (roundProfit === 0) return `Push — next bet unchanged ($${nextBet}).`;
     return `${roundProfit > 0 ? 'Win' : 'Loss'} — next bet ${nextBet} (${nextUnits}u).`;
   };
 
@@ -180,7 +180,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
       const result = startRound(state, bet);
       if (result.error) { stopWatching(`Auto-play stopped: ${result.error}`); return; }
       next = result.state;
-      note = [`Auto: DEAL ${bet}`, ...next.events, settleProgression(next)].filter(Boolean).join(' · ');
+      note = [`Auto: DEAL $${bet}`, ...next.events, settleProgression(next)].filter(Boolean).join(' · ');
     }
     setGame(next);
     setMessage(note);
@@ -312,9 +312,9 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
                       style={settings.progressionEnabled ? styles.blueSecondary : styles.blueGhost}
                     />
                     <Button label="CLEAR" variant="ghost" onPress={() => setPendingBet(0)} disabled={pendingBet === 0 || watching} style={styles.blueGhost} />
-                    {!settings.progressionEnabled && game.lastBet > 0 && pendingBet === 0 ? <Button label={`REBET ${game.lastBet}`} variant="secondary" onPress={() => deal(Math.min(game.lastBet, game.bankroll))} disabled={game.bankroll < game.rules.tableMinimum || watching} style={styles.blueSecondary} /> : null}
+                    {!settings.progressionEnabled && game.lastBet > 0 && pendingBet === 0 ? <Button label={`REBET $${game.lastBet}`} variant="secondary" onPress={() => deal(Math.min(game.lastBet, game.bankroll))} disabled={game.bankroll < game.rules.tableMinimum || watching} style={styles.blueSecondary} /> : null}
                     <Button
-                      label={dealAmount >= game.rules.tableMinimum ? `DEAL ${dealAmount}${pendingBet === 0 && autoBet > 0 ? ` · ${units}U` : ''}` : 'DEAL'}
+                      label={dealAmount >= game.rules.tableMinimum ? `DEAL $${dealAmount}${pendingBet === 0 && autoBet > 0 ? ` · ${units}U` : ''}` : 'DEAL'}
                       onPress={() => deal(dealAmount)}
                       disabled={dealAmount < game.rules.tableMinimum || watching}
                       style={styles.dealButton}
