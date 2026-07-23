@@ -150,7 +150,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
     const nextUnits = unitsForStep(current.bettingStrategy, next, current.progressionMaxUnits);
     const nextBet = progressionBet(nextUnits, state.rules, state.bankroll);
     if (roundProfit === 0) return `Push — next bet unchanged ($${nextBet}).`;
-    return `${roundProfit > 0 ? 'Win' : 'Loss'} — next bet ${nextBet} (${nextUnits}u).`;
+    return `${roundProfit > 0 ? 'Win' : 'Loss'} — next bet $${nextBet} (${nextUnits}u).`;
   };
 
   const stopWatching = (text = 'Auto-play stopped.') => {

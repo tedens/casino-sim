@@ -1,0 +1,21 @@
+// burgundy palette for the baccarat lab, mirrors the craps/blackjack theme shape
+export const bacColors = {
+  ink: '#f3ecec',
+  muted: '#b39a9e',
+  background: '#120608',
+  panel: '#1c0b0f',
+  panelLight: '#2b1218',
+  felt: '#4d1220',
+  feltDark: '#340c16',
+  border: '#5a2431',
+  borderLight: '#7c3345',
+  line: '#c9b277',
+  gold: '#d5ae53',
+  danger: '#ef6b64',
+  success: '#61d095',
+  cardRed: '#c22f3b',
+  cardBlack: '#1a2230',
+  playerBlue: '#5b8fd9',
+  bankerRed: '#d95b5b',
+  tieGreen: '#54b87e',
+};

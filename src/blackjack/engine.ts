@@ -1,7 +1,7 @@
 import { decide } from './basicStrategy';
 import { cardValue, handValue, isBust } from './cards';
-import { SeededRng, createManualSeed, deriveSeed } from '../domain/rng';
-import { AiPlayer, BlackjackHand, BlackjackRules, BlackjackState, Card, HandOutcome, PlayerAction, Rank, Suit } from './types';
+import { freshShoe, rotatedShoe } from '../casino/shoe';
+import { AiPlayer, BlackjackHand, BlackjackRules, BlackjackState, Card, HandOutcome, PlayerAction } from './types';
 
 export { cardText, cardValue, handLabel, handValue, isBust } from './cards';
 
@@ -26,43 +26,19 @@ export const INSURANCE_PAYOUT = 1.5;
 
 export const MAX_AI_PLAYERS = 5;
 
-const SUITS: Suit[] = ['♠', '♥', '♦', '♣'];
-const RANKS: Rank[] = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-
 export function isBlackjack(hand: BlackjackHand): boolean {
   return !hand.fromSplit && hand.cards.length === 2 && handValue(hand.cards).total === 21;
 }
 
-function buildShoe(shoeSeed: string, decks: number): Card[] {
-  const cards: Card[] = [];
-  for (let deck = 0; deck < decks; deck += 1) {
-    for (const suit of SUITS) for (const rank of RANKS) cards.push({ rank, suit });
-  }
-  const rng = new SeededRng(deriveSeed(shoeSeed, 'shoe'));
-  for (let i = cards.length - 1; i > 0; i -= 1) {
-    const j = rng.nextUint32() % (i + 1);
-    [cards[i], cards[j]] = [cards[j], cards[i]];
-  }
-  return cards;
-}
-
-// cut card lands at the configured penetration +/- 4%, derived from the shoe seed
-function cutReshuffleAt(shoeSeed: string, rules: BlackjackRules): number {
-  const rng = new SeededRng(deriveSeed(shoeSeed, 'cut'));
-  const jitter = (rng.nextFloat() - 0.5) * 0.08;
-  const penetration = Math.min(0.9, Math.max(0.5, rules.penetration + jitter));
-  return Math.floor(rules.decks * 52 * (1 - penetration));
-}
-
-// real shuffle: new random seed + new cut, so sessions aren't replayable across shoes
+// real shuffle via the shared shoe module: new random seed + new cut
 function rotateShoe(state: BlackjackState, reason: string): BlackjackState {
-  const shoeSeed = createManualSeed();
+  const next = rotatedShoe(state.shoeNumber, state.rules.decks, state.rules.penetration);
   return {
     ...state,
-    shoe: buildShoe(shoeSeed, state.rules.decks),
-    shoeSeed,
-    shoeNumber: state.shoeNumber + 1,
-    reshuffleAt: cutReshuffleAt(shoeSeed, state.rules),
+    shoe: next.cards,
+    shoeSeed: next.shoeSeed,
+    shoeNumber: next.shoeNumber,
+    reshuffleAt: next.reshuffleAt,
     events: [...state.events, reason],
   };
 }
@@ -71,14 +47,14 @@ export function createBlackjackState(options: { seed: string; startingBankroll?:
   const rules = { ...DEFAULT_BLACKJACK_RULES, ...options.rules };
   rules.aiPlayers = Math.max(0, Math.min(MAX_AI_PLAYERS, Math.round(rules.aiPlayers)));
   const bankroll = options.startingBankroll ?? 1000;
-  const shoe = buildShoe(options.seed, rules.decks);
+  const first = freshShoe(options.seed, 1, rules.decks, rules.penetration);
   return {
     seed: options.seed,
     rules,
-    shoe,
-    shoeNumber: 1,
-    shoeSeed: options.seed,
-    reshuffleAt: cutReshuffleAt(options.seed, rules),
+    shoe: first.cards,
+    shoeNumber: first.shoeNumber,
+    shoeSeed: first.shoeSeed,
+    reshuffleAt: first.reshuffleAt,
     bankroll,
     startingBankroll: bankroll,
     hands: [],
@@ -129,10 +105,11 @@ function playAiHands(state: BlackjackState): BlackjackState {
   const events = [...state.events];
   const drawLocal = (): Card => {
     if (shoe.length === 0) {
-      shoeSeed = createManualSeed();
-      shoeNumber += 1;
-      shoe = buildShoe(shoeSeed, state.rules.decks);
-      reshuffleAt = cutReshuffleAt(shoeSeed, state.rules);
+      const next = rotatedShoe(shoeNumber, state.rules.decks, state.rules.penetration);
+      shoe = next.cards;
+      shoeSeed = next.shoeSeed;
+      shoeNumber = next.shoeNumber;
+      reshuffleAt = next.reshuffleAt;
       events.push('Shoe exhausted mid-round · fresh shuffle & cut.');
     }
     return shoe.shift()!;
@@ -181,7 +158,7 @@ function playAiHands(state: BlackjackState): BlackjackState {
 export function startRound(state: BlackjackState, bet: number): { state: BlackjackState; error?: string } {
   if (state.phase === 'player') return { state, error: 'Round already in progress.' };
   if (bet < state.rules.tableMinimum) return { state, error: `Table minimum is $${state.rules.tableMinimum}.` };
-  if (bet > state.rules.tableMaximum) return { state, error: `Table maximum is ${state.rules.tableMaximum}.` };
+  if (bet > state.rules.tableMaximum) return { state, error: `Table maximum is $${state.rules.tableMaximum}.` };
   if (bet > state.bankroll) return { state, error: 'Bet exceeds bankroll.' };
 
   let next: BlackjackState = { ...state, events: [] };
