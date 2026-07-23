@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Svg, { Polygon, Polyline } from 'react-native-svg';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BETTING_STRATEGIES, nextStep, progressionBet, unitsForStep } from '../../blackjack/betting';
 import { availableActions, cardText, cardValue, createBlackjackState, handLabel, handValue, isBust, playerAction, sessionProfit, startRound } from '../../blackjack/engine';
 import { BlackjackSettings } from '../../blackjack/storage';
@@ -9,6 +8,17 @@ import { bjColors } from '../../blackjack/theme';
 import { BlackjackHand, BlackjackState, Card, PlayerAction } from '../../blackjack/types';
 import { createManualSeed } from '../../domain/rng';
 import { Button, Chip, ChipStack, Money, formatMoney } from '../../ui/components';
+import { ChartPalette, ProfitChart } from '../../ui/ProfitChart';
+
+const CHART_PALETTE: ChartPalette = {
+  background: bjColors.background,
+  border: '#233150',
+  accent: bjColors.gold,
+  ink: bjColors.ink,
+  muted: bjColors.muted,
+  success: bjColors.success,
+  danger: bjColors.danger,
+};
 
 const CHIP_VALUES = [1, 5, 25, 100, 500];
 const WATCH_SPEEDS = [250, 750, 1500, 3000];
@@ -50,97 +60,6 @@ function AiHandView({ hand }: { hand: BlackjackHand }) {
     <View style={styles.aiHand}>
       <View style={styles.handCards}>{hand.cards.map((card, index) => <View key={index} style={{ marginLeft: index === 0 ? 0 : -22 }}><PlayingCard card={card} compact /></View>)}</View>
       <Text style={[styles.aiTotal, outcome && { color: outcome.color }]}>{outcome ? `${status} · ${outcome.text}` : status}</Text>
-    </View>
-  );
-}
-
-const CHART_HEIGHT = 90;
-const CHART_MAX_POINTS = 400;
-
-function ProfitChart({ series }: { series: number[] }) {
-  const [width, setWidth] = useState(0);
-  const [cursorX, setCursorX] = useState<number | null>(null);
-  if (series.length === 0) return null;
-
-  let peak = 0;
-  let trough = 0;
-  for (const value of series) {
-    if (value > peak) peak = value;
-    if (value < trough) trough = value;
-  }
-  const range = Math.max(peak - trough, 1);
-  // downsample long sessions, keeping the first and last points
-  const stride = Math.max(1, Math.ceil(series.length / CHART_MAX_POINTS));
-  const points: Array<{ round: number; value: number }> = [];
-  for (let i = 0; i < series.length; i += stride) points.push({ round: i + 1, value: series[i] });
-  if (points[points.length - 1].round !== series.length) points.push({ round: series.length, value: series[series.length - 1] });
-
-  const latest = series[series.length - 1];
-  const yFor = (value: number) => ((peak - value) / range) * CHART_HEIGHT;
-  const xFor = (index: number) => (points.length === 1 ? 0 : (index / (points.length - 1)) * width);
-  const line = points.map((point, index) => `${xFor(index).toFixed(1)},${yFor(point.value).toFixed(1)}`).join(' ');
-  const cursorIndex = cursorX !== null && width > 0
-    ? Math.min(points.length - 1, Math.max(0, Math.round((cursorX / width) * (points.length - 1))))
-    : null;
-  const cursor = cursorIndex !== null ? points[cursorIndex] : null;
-
-  const chart = (
-    <View
-      style={styles.chart}
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-      onStartShouldSetResponder={() => true}
-      onResponderMove={(event) => setCursorX(event.nativeEvent.locationX)}
-      onResponderRelease={() => setCursorX(null)}
-    >
-      {width > 0 ? (
-        <Svg width={width} height={CHART_HEIGHT}>
-          <Polygon points={`0,${yFor(0).toFixed(1)} ${line} ${width.toFixed(1)},${yFor(0).toFixed(1)}`} fill="rgba(213,174,83,0.1)" />
-          <Polyline points={line} fill="none" stroke={bjColors.gold} strokeWidth={1.5} />
-        </Svg>
-      ) : null}
-      <View style={[styles.chartZero, { top: yFor(0) }]} />
-      {cursor && cursorIndex !== null ? (
-        <>
-          <View pointerEvents="none" style={[styles.crosshairV, { left: xFor(cursorIndex) }]} />
-          <View pointerEvents="none" style={[styles.crosshairH, { top: yFor(cursor.value) }]} />
-          <View pointerEvents="none" style={[styles.crosshairDot, { left: xFor(cursorIndex) - 3, top: yFor(cursor.value) - 3 }]} />
-          <View
-            pointerEvents="none"
-            style={[
-              styles.chartTooltip,
-              xFor(cursorIndex) < width / 2 ? { left: xFor(cursorIndex) + 10 } : { right: width - xFor(cursorIndex) + 10 },
-              { top: Math.min(Math.max(yFor(cursor.value) - 26, 0), CHART_HEIGHT - 24) },
-            ]}
-          >
-            <Text style={styles.chartTooltipText}>Round {cursor.round} · {formatMoney(cursor.value, true)}</Text>
-          </View>
-        </>
-      ) : null}
-    </View>
-  );
-
-  // mouse hover on web; native uses the responder drag above
-  const body = Platform.OS === 'web'
-    ? React.createElement('div', {
-      style: { position: 'relative', width: '100%' },
-      onMouseMove: (event: { currentTarget: { getBoundingClientRect: () => { left: number } }; clientX: number }) => {
-        setCursorX(event.clientX - event.currentTarget.getBoundingClientRect().left);
-      },
-      onMouseLeave: () => setCursorX(null),
-    }, chart)
-    : chart;
-
-  return (
-    <View style={styles.chartWrap}>
-      <View style={styles.chartHeader}>
-        <Text style={styles.chartTitle}>SESSION P/L · {series.length} ROUND{series.length === 1 ? '' : 'S'}</Text>
-        <Text style={[styles.chartValue, { color: latest >= 0 ? bjColors.success : bjColors.danger }]}>{formatMoney(latest, true)}</Text>
-      </View>
-      {body}
-      <View style={styles.chartHeader}>
-        <Text style={styles.chartBound}>LO {formatMoney(trough, true)}</Text>
-        <Text style={styles.chartBound}>HI {formatMoney(peak, true)}</Text>
-      </View>
     </View>
   );
 }
@@ -436,7 +355,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
         </View>
 
         {showPanel ? <ScrollView style={styles.sidePanel} contentContainerStyle={styles.sideContent}>
-          <ProfitChart series={game.profitSeries} />
+          <ProfitChart series={game.profitSeries} title="SESSION P/L" pointLabel="Round" palette={CHART_PALETTE} />
           <Text style={styles.panelSubtitle}>Round history</Text>
           {recentRounds.length === 0 ? <Text style={styles.empty}>No rounds yet.</Text> : recentRounds.map((round) => (
             <View key={round.index} style={styles.historyRow}>
@@ -535,16 +454,4 @@ const styles = StyleSheet.create({
   historyProfit: { fontWeight: '900', fontVariant: ['tabular-nums'], fontSize: 12 },
   note: { color: bjColors.muted, lineHeight: 19, fontSize: 12 },
   seed: { color: '#6e7f94', fontSize: 9, marginTop: 8 },
-  chartWrap: { marginTop: 8, padding: 10, borderRadius: 10, backgroundColor: bjColors.background, borderWidth: 1, borderColor: '#233150', gap: 5 },
-  chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  chartTitle: { color: bjColors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
-  chartValue: { fontWeight: '900', fontSize: 13, fontVariant: ['tabular-nums'] },
-  chart: { height: CHART_HEIGHT, position: 'relative' },
-  chartZero: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(147,162,184,0.6)' },
-  crosshairV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(233,236,244,0.45)' },
-  crosshairH: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: 'rgba(233,236,244,0.25)' },
-  crosshairDot: { position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: bjColors.gold, borderWidth: 1, borderColor: '#0a101c' },
-  chartTooltip: { position: 'absolute', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 6, backgroundColor: '#06090f', borderWidth: 1, borderColor: bjColors.gold, zIndex: 10 },
-  chartTooltipText: { color: bjColors.ink, fontSize: 10, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  chartBound: { color: bjColors.muted, fontSize: 8, fontWeight: '800', fontVariant: ['tabular-nums'] },
 });

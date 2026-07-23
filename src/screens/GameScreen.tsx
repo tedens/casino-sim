@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BELLAGIO_RULESET } from '../domain/ruleset';
 import { createGameState, invalidWagerForRoll, moveWagerTarget, placeWager, removeWager, resizeWager, sessionProfit, setWagerWorking, settleRoll, wagerLabel } from '../domain/engine';
@@ -10,6 +10,7 @@ import { StrategyContext, StrategyDefinition, StrategyProposal } from '../strate
 import { AppSettings } from '../storage/storage';
 import { Button, Chip, ChipStack, DiceResult, Money, formatMoney } from '../ui/components';
 import { colors } from '../ui/theme';
+import { ChartPalette, ProfitChart } from '../ui/ProfitChart';
 
 const DiceThrow = React.lazy(async () => {
   if (Platform.OS === 'web') {
@@ -24,6 +25,20 @@ const CHIP_VALUES = [1, 5, 25, 100, 500];
 const POINTS: PointNumber[] = [4, 5, 6, 8, 9, 10];
 const HOPS: WagerTarget[] = Array.from({ length: 6 }, (_, a) => Array.from({ length: 6 - a }, (_, offset) => `${a + 1}-${a + 1 + offset}` as WagerTarget)).flat();
 const WATCH_SPEEDS = [250, 750, 1500, 3000];
+
+const CHART_PALETTE: ChartPalette = {
+  background: colors.background,
+  border: '#315247',
+  accent: colors.gold,
+  ink: colors.ink,
+  muted: colors.muted,
+  success: colors.success,
+  danger: colors.danger,
+};
+
+// realized cash per settlement: winners bank profit, losers forfeit the stake
+const settlementNet = (item: { status: string; profit: number; stake: number }) =>
+  item.status === 'won' ? item.profit : item.status === 'lost' ? -item.stake : 0;
 const DICE_HOLD_MS = 1700;
 const DICE_DOCK_MS = 650;
 
@@ -125,6 +140,7 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
   const [winFlash, setWinFlash] = useState<number | null>(null);
   const [pointConflict, setPointConflict] = useState<PointConflict | null>(null);
   const [feltSize, setFeltSize] = useState({ width: 800, height: 430 });
+  const [showProps, setShowProps] = useState(true);
   const [landing, setLanding] = useState({ first: { x: 0.44, y: 0.45 }, second: { x: 0.63, y: 0.58 }, wallX: 0.84 });
   const rng = useRef(new SeededRng(game.seed, 'outcome'));
   const visualRng = useRef(new SeededRng(game.seed, 'animation'));
@@ -401,7 +417,15 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
 
   const inspect = game.wagers.find((wager) => wager.id === selectedWager);
   const latest = game.history.at(-1);
-  const lastRolls = game.history.slice(-8).reverse();
+  const lastRolls = game.history.slice(-10).reverse();
+  const profitSeries = useMemo(() => {
+    let cumulative = 0;
+    return game.history.map((roll) => {
+      for (const item of roll.settlements) cumulative += settlementNet(item);
+      return cumulative;
+    });
+  }, [game.history]);
+  const onTableTotal = game.wagers.reduce((sum, wager) => sum + wager.amount, 0);
   const numberOdds: Record<PointNumber, string> = { 4: '9:5', 5: '7:5', 6: '7:6', 8: '7:6', 9: '7:5', 10: '9:5' };
   const handleFeltLayout = (event: LayoutChangeEvent) => setFeltSize(event.nativeEvent.layout);
   const invalidWager = invalidWagerForRoll(game);
@@ -521,8 +545,28 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
         </View>
 
         <ScrollView style={styles.sidePanel} contentContainerStyle={styles.sideContent}>
+          <ProfitChart series={profitSeries} title="REALIZED P/L" pointLabel="Roll" palette={CHART_PALETTE} />
+
+          <Text style={styles.panelSubtitle}>Roll history</Text>
+          {lastRolls.length === 0 ? <Text style={styles.empty}>No rolls yet.</Text> : lastRolls.map((roll) => {
+            const net = roll.settlements.reduce((sum, item) => sum + settlementNet(item), 0);
+            return (
+              <View key={roll.index} style={styles.historyRow}>
+                <Text style={styles.historyIndex}>#{roll.index}</Text>
+                <Text style={styles.historyShooter}>S{roll.shooterNumber ?? '?'}</Text>
+                <Text style={styles.historyDice}>{roll.die1} + {roll.die2}</Text>
+                <Text style={styles.historyTotal}>{roll.total}</Text>
+                <Text style={styles.historyPoint}>{roll.pointAfter ? `Point ${roll.pointAfter}` : 'Come out'}</Text>
+                <Text style={[styles.historyNet, { color: net > 0 ? colors.success : net < 0 ? colors.danger : colors.muted }]}>{net === 0 ? '—' : formatMoney(net, true)}</Text>
+              </View>
+            );
+          })}
+
           <View style={styles.propFelt}>
-          <Text style={styles.propOverline}>STICKMAN · CENTER ACTION</Text>
+          <Pressable onPress={() => setShowProps((value) => !value)}>
+            <Text style={styles.propOverline}>STICKMAN · CENTER ACTION  {showProps ? '▾' : '▸'}</Text>
+          </Pressable>
+          {showProps ? <>
           <Text style={styles.panelTitle}>HARDWAYS</Text>
           <View style={styles.propGrid}>
             {([4, 6, 8, 10] as PointNumber[]).map((point) => <BetZone key={`hard-${point}`} label={`HARD ${point}`} sublabel={point === 4 || point === 10 ? '7:1' : '9:1'} amount={amountOn(game, 'hardway', point)} onPress={() => addBet({ kind: 'hardway', target: point })} compact />)}
@@ -541,9 +585,10 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
 
           <Text style={styles.propSectionLabel}>HOP BETS · HARD 30:1 · EASY 15:1</Text>
           <View style={styles.hopGrid}>{HOPS.map((hop) => <Button key={String(hop)} label={`${hop} ${String(hop)[0] === String(hop)[2] ? '30:1' : '15:1'}`} variant="ghost" onPress={() => addBet({ kind: 'hop', target: hop })} style={styles.hopButton} />)}</View>
+          </> : null}
           </View>
 
-          <Text style={styles.panelSubtitle}>Active wagers</Text>
+          <Text style={styles.panelSubtitle}>Active wagers{game.wagers.length > 0 ? ` · ${game.wagers.length} · ${formatMoney(onTableTotal)}` : ''}</Text>
           {game.wagers.length === 0 ? <Text style={styles.empty}>No action yet.</Text> : game.wagers.map((wager) => (
             <Button key={wager.id} label={`${wagerLabel(wager)} · ${formatMoney(wager.amount)}${wager.working ? '' : game.phase === 'point' ? ' · OFF AT COME-OUT' : ' · OFF'}`} variant={selectedWager === wager.id ? 'primary' : 'ghost'} onPress={() => setSelectedWager(wager.id)} style={styles.wagerButton} />
           ))}
@@ -573,8 +618,6 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
             </View>
           ) : null}
 
-          <Text style={styles.panelSubtitle}>Roll history</Text>
-          {lastRolls.map((roll) => <View key={roll.index} style={styles.historyRow}><Text style={styles.historyIndex}>#{roll.index}</Text><Text style={styles.historyShooter}>S{roll.shooterNumber ?? '?'}</Text><Text style={styles.historyDice}>{roll.die1} + {roll.die2}</Text><Text style={styles.historyTotal}>{roll.total}</Text><Text style={styles.historyPoint}>{roll.pointAfter ? `Point ${roll.pointAfter}` : 'Come out'}</Text></View>)}
           {latest ? <Text style={styles.seed} selectable>Seed: {game.seed}</Text> : null}
         </ScrollView>
       </View>
@@ -708,5 +751,6 @@ const styles = StyleSheet.create({
   historyDice: { color: colors.ink, width: 56, fontWeight: '700' },
   historyTotal: { color: colors.gold, fontWeight: '900', fontSize: 17, width: 32 },
   historyPoint: { color: colors.muted, fontSize: 11 },
+  historyNet: { marginLeft: 'auto', fontWeight: '900', fontSize: 11, fontVariant: ['tabular-nums'] },
   seed: { color: '#6e9487', fontSize: 9, marginTop: 8 },
 });
