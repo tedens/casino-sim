@@ -1,0 +1,56 @@
+# Casino Strategy Lab
+
+Offline Expo simulator with two labs, switchable from the top-left menu. Runs on iOS, Android, and web.
+
+## Craps lab
+
+- Interactive half-table layout with standard line, number, center, hardway, horn, C & E, and hop bets.
+- Two independently generated d6 outcomes using seeded xoshiro128** and rejection sampling.
+- Skia/Reanimated 2.5D dice throw with separate animation randomness.
+- Exact casino payout units, 3-4-5x odds, triple field 12, working bets, and contract locking.
+- Visual strategy rules plus portable versioned JSON, five included presets, and a watch mode.
+- Seeded batch comparisons with ROI, drawdown, ruin rate, house edge, confidence intervals, and CSV/JSON export.
+
+## Blackjack lab
+
+- Configurable house rules: decks, H17/S17, 3:2 or 6:5, late surrender, double after split, insurance on 20 vs ace.
+- Basic-strategy hints on the felt plus a rule-aware strategy chart, generated from the same decision engine.
+- Betting strategies: flat, win press +1, Paroli, 1-3-2-6, Martingale, with unit caps.
+- Auto-play that follows the book for every hand and sizes bets from the active strategy.
+- Up to five bot seats playing basic strategy from the same shoe, dealt in casino order.
+- Per-shoe seed rotation with a jittered cut card; full-session P/L graph with hover crosshair.
+
+## Run
+
+Requires Node.js and pnpm.
+
+```bash
+pnpm install
+pnpm start
+pnpm web
+```
+
+For native builds, use the normal Expo development-build workflow. Gameplay is landscape-first.
+
+## Verify
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm exec expo export --platform web
+```
+
+## Deploy
+
+Pushing to `main` builds the web export and publishes it to GitHub Pages via `.github/workflows/deploy.yml`. Enable Pages in the repo settings with "GitHub Actions" as the source. The workflow sets `BASE_URL` to the repo name so assets resolve under `https://<user>.github.io/<repo>/`.
+
+## Structure
+
+- `src/domain`: craps rules, wager lifecycle, payout engine, and dice PRNG.
+- `src/strategy`: craps JSON rule evaluator and built-in presets.
+- `src/simulation`: deterministic batch and comparison runner.
+- `src/blackjack`: blackjack engine, basic strategy, betting strategies, and theme.
+- `src/screens`: craps table, strategy builder, lab, payout reference, settings, and the blackjack screens.
+- `src/storage`: local strategy, settings, and report persistence.
+
+AsyncStorage persistence; no backend or network account. Educational simulator only. No real-money wagering.
