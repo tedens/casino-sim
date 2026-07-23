@@ -35,7 +35,7 @@ const BLACKJACK_NAV: Array<{ id: BlackjackScreen; label: string; short: string }
 ];
 
 const LABS: Array<{ id: LabId; title: string; subtitle: string }> = [
-  { id: 'craps', title: 'CRAPS\nLAB', subtitle: 'Dice · green felt' },
+  { id: 'craps', title: 'CRAPS', subtitle: 'Dice · green felt' },
   { id: 'blackjack', title: 'BLACK\nJACK', subtitle: '21 · blue felt' },
 ];
 

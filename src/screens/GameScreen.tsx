@@ -406,6 +406,13 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
   const handleFeltLayout = (event: LayoutChangeEvent) => setFeltSize(event.nativeEvent.layout);
   const invalidWager = invalidWagerForRoll(game);
   const canRoll = game.wagers.length > 0 && !rolling && !watching && !game.stopped && !pointConflictWager && !invalidWager;
+  const invalidUnit = invalidWager ? requiredUnit(invalidWager, game) : 0;
+  // when the roll button is locked, say why in the message line instead of failing silently
+  const rollBlockReason = rolling || watching || game.stopped ? ''
+    : pointConflictWager ? `Point ${pointConflict?.point} conflict: move, take down, or leave your ${wagerLabel(pointConflictWager)} (side panel).`
+    : invalidWager ? `${wagerLabel(invalidWager)} is ${formatMoney(invalidWager.amount)} but pays in $${invalidUnit} units — bring it to ${formatMoney(Math.ceil(invalidWager.amount / invalidUnit) * invalidUnit)} or take it down.`
+    : game.wagers.length === 0 ? 'Place at least one bet to roll.'
+    : '';
   const chooseStrategy = (id: string) => {
     if (watchingRef.current) stopWatching('Strategy watch stopped.');
     onSelectStrategy(id);
@@ -499,7 +506,7 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
             <View style={styles.chipTray}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} selected={chip === value} onPress={() => selectChip(value)} />)}</View>
             {diceLocation === 'tray' ? <DiceResult faces={dice as [1 | 2 | 3 | 4 | 5 | 6, 1 | 2 | 3 | 4 | 5 | 6]} /> : <View style={styles.diceResultPlaceholder} />}
             <View style={styles.rollArea}>
-              <Text style={styles.message} numberOfLines={2}>{message}</Text>
+              <Text style={[styles.message, rollBlockReason ? styles.blockReason : null]} numberOfLines={2}>{rollBlockReason || message}</Text>
               <Button label={rolling ? 'ROLLING…' : 'ROLL DICE'} onPress={doRoll} disabled={!canRoll} style={styles.rollButton} />
             </View>
             </View>
@@ -538,7 +545,7 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
 
           <Text style={styles.panelSubtitle}>Active wagers</Text>
           {game.wagers.length === 0 ? <Text style={styles.empty}>No action yet.</Text> : game.wagers.map((wager) => (
-            <Button key={wager.id} label={`${wagerLabel(wager)} · ${formatMoney(wager.amount)}${wager.working ? '' : ' · OFF'}`} variant={selectedWager === wager.id ? 'primary' : 'ghost'} onPress={() => setSelectedWager(wager.id)} style={styles.wagerButton} />
+            <Button key={wager.id} label={`${wagerLabel(wager)} · ${formatMoney(wager.amount)}${wager.working ? '' : game.phase === 'point' ? ' · OFF AT COME-OUT' : ' · OFF'}`} variant={selectedWager === wager.id ? 'primary' : 'ghost'} onPress={() => setSelectedWager(wager.id)} style={styles.wagerButton} />
           ))}
           {inspect ? <WagerInspector wager={inspect} state={game} onChange={(next, text) => { if (next !== game) recordBetChange(next); setMessage(text); }} /> : null}
 
@@ -662,6 +669,7 @@ const styles = StyleSheet.create({
   diceResultPlaceholder: { width: 106, height: 58 },
   rollArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   message: { flex: 1, color: colors.muted, fontSize: 11 },
+  blockReason: { color: '#e8b551', fontWeight: '800' },
   rollButton: { minWidth: 122, minHeight: 58 },
   automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#303832', paddingTop: 4 },
   toolButton: { minHeight: 29, paddingHorizontal: 9 },

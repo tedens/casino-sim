@@ -48,11 +48,11 @@ function actionKey(action: StrategyAction): string {
 }
 
 function actionText(action: StrategyAction): string {
-  if (action.type === 'place') return `Place $${action.amount} on ${action.kind}${action.target ? ` ${action.target}` : ''}.`;
+  if (action.type === 'place') return `Place ${action.amount} on ${action.kind}${action.target ? ` ${action.target}` : ''}.`;
   if (action.type === 'takeMaxOdds') return `Take maximum odds on ${action.selector.kind}.`;
   if (action.type === 'remove') return `Remove ${action.selector.kind}.`;
   if (action.type === 'press') return `Press ${action.selector.kind}${action.selector.target ? ` ${action.selector.target}` : ''}.`;
-  if (action.type === 'regress') return `Regress ${action.selector.kind} to $${action.amount}.`;
+  if (action.type === 'regress') return `Regress ${action.selector.kind} to ${action.amount}.`;
   if (action.type === 'collect') return `Collect ${action.selector.kind} win.`;
   if (action.type === 'setWorking') return `Turn ${action.selector.kind} ${action.working ? 'on' : 'off'}.`;
   return action.reason;

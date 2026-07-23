@@ -180,8 +180,8 @@ function playAiHands(state: BlackjackState): BlackjackState {
 
 export function startRound(state: BlackjackState, bet: number): { state: BlackjackState; error?: string } {
   if (state.phase === 'player') return { state, error: 'Round already in progress.' };
-  if (bet < state.rules.tableMinimum) return { state, error: `Table minimum is $${state.rules.tableMinimum}.` };
-  if (bet > state.rules.tableMaximum) return { state, error: `Table maximum is $${state.rules.tableMaximum}.` };
+  if (bet < state.rules.tableMinimum) return { state, error: `Table minimum is ${state.rules.tableMinimum}.` };
+  if (bet > state.rules.tableMaximum) return { state, error: `Table maximum is ${state.rules.tableMaximum}.` };
   if (bet > state.bankroll) return { state, error: 'Bet exceeds bankroll.' };
 
   let next: BlackjackState = { ...state, events: [] };
@@ -226,7 +226,7 @@ export function startRound(state: BlackjackState, bet: number): { state: Blackja
 
   if (next.rules.insureTwentyVsAce && dealerUp.rank === 'A' && handValue(hand.cards).total === 20 && next.bankroll >= bet / 2) {
     const stake = bet / 2;
-    next = { ...next, bankroll: next.bankroll - stake, insurance: { stake }, events: [...next.events, `Insurance taken on 20 vs ace — $${stake} pays 3:2.`] };
+    next = { ...next, bankroll: next.bankroll - stake, insurance: { stake }, events: [...next.events, `Insurance taken on 20 vs ace — ${stake} pays 3:2.`] };
   }
 
   const dealerPeeks = cardValue(dealerUp) >= 10;
@@ -234,7 +234,7 @@ export function startRound(state: BlackjackState, bet: number): { state: Blackja
   if (dealerPeeks && dealerHasBlackjack) {
     if (next.insurance) {
       const winnings = next.insurance.stake * INSURANCE_PAYOUT;
-      next = { ...next, bankroll: next.bankroll + next.insurance.stake + winnings, insurance: { ...next.insurance, result: 'won' }, events: [...next.events, `Insurance wins $${winnings}.`] };
+      next = { ...next, bankroll: next.bankroll + next.insurance.stake + winnings, insurance: { ...next.insurance, result: 'won' }, events: [...next.events, `Insurance wins ${winnings}.`] };
     }
     return { state: settleRound({ ...next, holeRevealed: true, events: [...next.events, 'Dealer shows blackjack.'] }) };
   }
@@ -376,7 +376,7 @@ function settleRound(state: BlackjackState): BlackjackState {
       : 0;
     bankroll += returned;
     const profit = returned - hand.bet;
-    events.push(`${outcome === 'blackjack' ? 'Blackjack' : outcome === 'surrender' ? 'Surrender' : `${value > 21 ? 'Bust' : value} vs dealer ${dealerBust ? 'bust' : dealerValue.total}`} · ${outcome.toUpperCase()} ${profit === 0 ? '' : `${profit > 0 ? '+' : '−'}$${Math.abs(profit)}`}`.trim());
+    events.push(`${outcome === 'blackjack' ? 'Blackjack' : outcome === 'surrender' ? 'Surrender' : `${value > 21 ? 'Bust' : value} vs dealer ${dealerBust ? 'bust' : dealerValue.total}`} · ${outcome.toUpperCase()} ${profit === 0 ? '' : `${profit > 0 ? '+' : '−'}${Math.abs(profit)}`}`.trim());
     return { ...hand, stood: true, outcome, profit };
   });
   const settledAi = next.aiPlayers.map((player) => ({
