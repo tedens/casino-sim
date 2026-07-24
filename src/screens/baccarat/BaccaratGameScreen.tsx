@@ -243,7 +243,7 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
                   <Text style={[styles.handLabel, { color: bacColors.playerBlue }]}>PLAYER{showHands ? ` · ${baccaratTotal(game.playerCards)}` : ''}</Text>
                   <View style={styles.handCards}>
                     {showHands
-                      ? game.playerCards.map((item, index) => <DealtCard key={index} index={index} style={[styles.cardSlot, { marginLeft: index === 0 ? 0 : -26 }]}><CardFace card={item} /></DealtCard>)
+                      ? game.playerCards.map((item, index) => <DealtCard key={index} order={0} index={index} style={[styles.cardSlot, { marginLeft: index === 0 ? 0 : -26 }]}><CardFace card={item} /></DealtCard>)
                       : <Text style={styles.placeholder}>—</Text>}
                   </View>
                   {showHands && game.outcome === 'player' ? <Text style={[styles.winBadge, { color: bacColors.playerBlue, borderColor: bacColors.playerBlue }]}>WINS</Text> : null}
@@ -253,7 +253,7 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
                   <Text style={[styles.handLabel, { color: bacColors.bankerRed }]}>BANKER{showHands ? ` · ${baccaratTotal(game.bankerCards)}` : ''}</Text>
                   <View style={styles.handCards}>
                     {showHands
-                      ? game.bankerCards.map((item, index) => <DealtCard key={index} index={index + 1} style={[styles.cardSlot, { marginLeft: index === 0 ? 0 : -26 }]}><CardFace card={item} /></DealtCard>)
+                      ? game.bankerCards.map((item, index) => <DealtCard key={index} order={1} index={index} style={[styles.cardSlot, { marginLeft: index === 0 ? 0 : -26 }]}><CardFace card={item} /></DealtCard>)
                       : <Text style={styles.placeholder}>—</Text>}
                   </View>
                   {showHands && game.outcome === 'banker' ? <Text style={[styles.winBadge, { color: bacColors.bankerRed, borderColor: bacColors.bankerRed }]}>WINS</Text> : null}
