@@ -18,6 +18,8 @@ export interface BlackjackSettings {
   bettingStrategy: string;
   aiPlayers: number;
   insureTwentyVsAce: boolean;
+  /** skip the deal animation; cards still appear in casino rotation order */
+  instantDeal: boolean;
 }
 
 export const DEFAULT_BLACKJACK_SETTINGS: BlackjackSettings = {
@@ -35,6 +37,7 @@ export const DEFAULT_BLACKJACK_SETTINGS: BlackjackSettings = {
   bettingStrategy: 'winPress',
   aiPlayers: 0,
   insureTwentyVsAce: false,
+  instantDeal: false,
 };
 
 export async function loadBlackjackSettings(): Promise<BlackjackSettings> {

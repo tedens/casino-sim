@@ -10,7 +10,7 @@ import { BlackjackHand, BlackjackState, Card, PlayerAction } from '../../blackja
 import { createManualSeed } from '../../domain/rng';
 import { Button, Chip, ChipStack, Money, formatMoney } from '../../ui/components';
 import { ChartPalette, ProfitChart } from '../../ui/ProfitChart';
-import { DealtCard } from '../../ui/DealtCard';
+import { DealtCard, rotationDelay } from '../../ui/DealtCard';
 
 const CHART_PALETTE: ChartPalette = {
   background: bjColors.background,
@@ -55,22 +55,22 @@ function PlayingCard({ card, faceDown, compact }: { card?: Card; faceDown?: bool
   );
 }
 
-function AiHandView({ hand, order }: { hand: BlackjackHand; order: number }) {
+function AiHandView({ hand, order, positions, instant }: { hand: BlackjackHand; order: number; positions: number; instant: boolean }) {
   const outcome = hand.outcome ? OUTCOME_STYLE[hand.outcome] : undefined;
   const status = hand.surrendered ? 'SURR' : isBust(hand.cards) ? 'BUST' : hand.doubled ? `${handValue(hand.cards).total} ×2` : String(handValue(hand.cards).total);
   return (
     <View style={styles.aiHand}>
-      <View style={styles.handCards}>{hand.cards.map((card, index) => <DealtCard key={index} order={order} index={index} style={{ marginLeft: index === 0 ? 0 : -22 }}><PlayingCard card={card} compact /></DealtCard>)}</View>
+      <View style={styles.handCards}>{hand.cards.map((card, index) => <DealtCard key={index} delayMs={rotationDelay(order, index, positions)} instant={instant} style={{ marginLeft: index === 0 ? 0 : -22 }}><PlayingCard card={card} compact /></DealtCard>)}</View>
       <Text style={[styles.aiTotal, outcome && { color: outcome.color }]}>{outcome ? `${status} · ${outcome.text}` : status}</Text>
     </View>
   );
 }
 
-function HandView({ hand, active, showTotal, order }: { hand: BlackjackHand; active: boolean; showTotal: boolean; order: number }) {
+function HandView({ hand, active, showTotal, order, positions, instant }: { hand: BlackjackHand; active: boolean; showTotal: boolean; order: number; positions: number; instant: boolean }) {
   const outcome = hand.outcome ? OUTCOME_STYLE[hand.outcome] : undefined;
   return (
     <View style={[styles.handBox, active && styles.activeHandBox]}>
-      <View style={styles.handCards}>{hand.cards.map((card, index) => <DealtCard key={index} order={order} index={index} style={[styles.handCardSlot, { marginLeft: index === 0 ? 0 : -30 }]}><PlayingCard card={card} /></DealtCard>)}</View>
+      <View style={styles.handCards}>{hand.cards.map((card, index) => <DealtCard key={index} delayMs={rotationDelay(order, index, positions)} instant={instant} style={[styles.handCardSlot, { marginLeft: index === 0 ? 0 : -30 }]}><PlayingCard card={card} /></DealtCard>)}</View>
       {showTotal ? <Text style={[styles.handTotal, isBust(hand.cards) && styles.bustTotal]}>{handLabel(hand.cards)}{hand.doubled ? ' · DOUBLED' : ''}{hand.surrendered ? ' · SURRENDERED' : ''}</Text> : null}
       <View style={styles.handMeta}>
         <ChipStack amount={hand.bet} size="compact" />
@@ -275,7 +275,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
                 <View style={styles.dealerCards}>
                   {game.dealer.length === 0 || freshBetting
                     ? <Text style={styles.placeholder}>Waiting on a bet…</Text>
-                    : game.dealer.map((card, index) => <DealtCard key={index} order={game.aiPlayers.length + 1} index={index} style={[styles.handCardSlot, { marginLeft: index === 0 ? 0 : -30 }]}><PlayingCard card={card} faceDown={index === 1 && !game.holeRevealed} /></DealtCard>)}
+                    : game.dealer.map((card, index) => <DealtCard key={index} delayMs={rotationDelay(game.aiPlayers.length + 1, index, game.aiPlayers.length + 2)} instant={settings.instantDeal} style={[styles.handCardSlot, { marginLeft: index === 0 ? 0 : -30 }]}><PlayingCard card={card} faceDown={index === 1 && !game.holeRevealed} /></DealtCard>)}
                 </View>
               </View>
               <Text style={styles.rulesArc}>{rulesLine}</Text>
@@ -290,7 +290,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
                           {seat ? ` · ${formatMoney(seat.bankroll)}` : ''}
                           {seat && seat.friends > 0 ? ` · F×${seat.friends}` : ''}
                         </Text>
-                        <View style={styles.aiHands}>{player.hands.map((hand) => <AiHandView key={hand.id} hand={hand} order={index} />)}</View>
+                        <View style={styles.aiHands}>{player.hands.map((hand) => <AiHandView key={hand.id} hand={hand} order={index} positions={game.aiPlayers.length + 2} instant={settings.instantDeal} />)}</View>
                       </View>
                     );
                   })}
@@ -307,7 +307,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
                 <View style={styles.handsRow}>
                   {game.hands.length === 0 || freshBetting
                     ? <View style={styles.betSpot}><Text style={styles.betSpotText}>BET</Text>{pendingBet > 0 ? <ChipStack amount={pendingBet} /> : autoBet >= game.rules.tableMinimum ? <ChipStack amount={autoBet} /> : null}</View>
-                    : game.hands.map((hand, index) => <HandView key={hand.id} hand={hand} active={game.phase === 'player' && index === game.activeHand} showTotal order={game.aiPlayers.length} />)}
+                    : game.hands.map((hand, index) => <HandView key={hand.id} hand={hand} active={game.phase === 'player' && index === game.activeHand} showTotal order={game.aiPlayers.length} positions={game.aiPlayers.length + 2} instant={settings.instantDeal} />)}
                 </View>
               </View>
               <Text style={styles.feltBrand}>◆  BLACKJACK STRATEGY LAB  ◆</Text>

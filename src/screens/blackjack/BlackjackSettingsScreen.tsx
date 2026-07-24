@@ -35,6 +35,7 @@ export function BlackjackSettingsScreen({ settings, onSave }: { settings: Blackj
   const [customs, setCustoms] = useState<CustomBettingStrategy[]>([]);
   const [aiPlayers, setAiPlayers] = useState(settings.aiPlayers);
   const [insureTwenty, setInsureTwenty] = useState(settings.insureTwentyVsAce);
+  const [instantDeal, setInstantDeal] = useState(settings.instantDeal);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export function BlackjackSettingsScreen({ settings, onSave }: { settings: Blackj
     setBettingStrategy(settings.bettingStrategy);
     setAiPlayers(settings.aiPlayers);
     setInsureTwenty(settings.insureTwentyVsAce);
+    setInstantDeal(settings.instantDeal);
   }, [settings]);
 
   const save = () => {
@@ -81,6 +83,7 @@ export function BlackjackSettingsScreen({ settings, onSave }: { settings: Blackj
       bettingStrategy,
       aiPlayers,
       insureTwentyVsAce: insureTwenty,
+      instantDeal,
     });
     setMessage('Saved. Rule changes apply when starting a new session.');
   };
@@ -128,6 +131,7 @@ export function BlackjackSettingsScreen({ settings, onSave }: { settings: Blackj
       <View style={styles.card}>
         <SectionTitle>Coaching</SectionTitle>
         <Toggle label="Show hints" value={showHints} onToggle={() => setShowHints((value) => !value)} note="Displays the basic-strategy book play on the felt and highlights the matching action button. Also toggleable from the table top bar." />
+        <Toggle label="Instant deal" value={instantDeal} onToggle={() => setInstantDeal((value) => !value)} note="Skip the dealing animation — every card appears at once. Cards are still dealt in casino rotation order (each seat, then you, then the dealer, twice around); this only removes the on-screen motion." />
       </View>
       <Button label="Save settings" onPress={save} style={styles.save} />
       {message ? <Text style={styles.message}>{message}</Text> : null}
