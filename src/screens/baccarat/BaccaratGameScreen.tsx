@@ -4,11 +4,13 @@ import { BET_KINDS, baccaratTotal, betLabel, createBaccaratState, playRound, ses
 import { BaccaratSettings } from '../../baccarat/storage';
 import { bacColors } from '../../baccarat/theme';
 import { BaccaratBetKind, BaccaratOutcome, BaccaratState } from '../../baccarat/types';
-import { BETTING_STRATEGIES, nextStep, progressionBet, unitsForStep } from '../../blackjack/betting';
+import { progressionBet, resolveStrategy } from '../../blackjack/betting';
+import { CustomBettingStrategy, loadCustomStrategies } from '../../casino/customStrategies';
 import { Card } from '../../blackjack/types';
 import { createManualSeed } from '../../domain/rng';
 import { Button, Chip, ChipStack, Money, formatMoney } from '../../ui/components';
 import { ChartPalette, ProfitChart } from '../../ui/ProfitChart';
+import { DealtCard } from '../../ui/DealtCard';
 
 const CHIP_VALUES = [1, 5, 25, 100, 500];
 const WATCH_SPEEDS = [250, 750, 1500, 3000];
@@ -49,25 +51,27 @@ function CardFace({ card }: { card: Card }) {
   );
 }
 
-function BeadRoad({ road }: { road: BaccaratOutcome[] }) {
+function BeadRoad({ road, shoeNumber }: { road: BaccaratOutcome[]; shoeNumber: number }) {
   if (road.length === 0) return null;
-  const recent = road.slice(-48);
   const columns: BaccaratOutcome[][] = [];
-  for (let i = 0; i < recent.length; i += 6) columns.push(recent.slice(i, i + 6));
+  for (let i = 0; i < road.length; i += 6) columns.push(road.slice(i, i + 6));
+  const tally = road.reduce((counts, outcome) => ({ ...counts, [outcome]: (counts[outcome] ?? 0) + 1 }), {} as Partial<Record<BaccaratOutcome, number>>);
   return (
     <View style={styles.beadWrap}>
-      <Text style={styles.beadTitle}>BEAD ROAD · LAST {recent.length}</Text>
-      <View style={styles.beadGrid}>
-        {columns.map((column, c) => (
-          <View key={c} style={styles.beadColumn}>
-            {column.map((outcome, r) => (
-              <View key={r} style={[styles.bead, { backgroundColor: OUTCOME_COLORS[outcome] }]}>
-                <Text style={styles.beadText}>{outcome === 'player' ? 'P' : outcome === 'banker' ? 'B' : 'T'}</Text>
-              </View>
-            ))}
-          </View>
-        ))}
-      </View>
+      <Text style={styles.beadTitle}>SHOE #{shoeNumber} BEAD ROAD · P {tally.player ?? 0} · B {tally.banker ?? 0} · T {tally.tie ?? 0}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.beadGrid}>
+          {columns.map((column, c) => (
+            <View key={c} style={styles.beadColumn}>
+              {column.map((outcome, r) => (
+                <View key={r} style={[styles.bead, { backgroundColor: OUTCOME_COLORS[outcome] }]}>
+                  <Text style={styles.beadText}>{outcome === 'player' ? 'P' : outcome === 'banker' ? 'B' : 'T'}</Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -94,8 +98,14 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
   const watchDelayRef = useRef(750);
   const watchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const stepRef = useRef(0);
+  const [customs, setCustoms] = useState<CustomBettingStrategy[]>([]);
+  const customsRef = useRef<CustomBettingStrategy[]>([]);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  useEffect(() => {
+    loadCustomStrategies().then((loaded) => { customsRef.current = loaded; setCustoms(loaded); }).catch(() => undefined);
+  }, []);
 
   const applyStep = (value: number) => {
     stepRef.current = value;
@@ -111,8 +121,8 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
     applyStep(0);
   }, [settings.bettingStrategy]);
 
-  const strategy = BETTING_STRATEGIES.find((item) => item.id === settings.bettingStrategy) ?? BETTING_STRATEGIES[0];
-  const units = unitsForStep(strategy.id, step, settings.progressionMaxUnits);
+  const strategy = resolveStrategy(settings.bettingStrategy, customs);
+  const units = strategy.unitsForStep(step, settings.progressionMaxUnits);
   const autoBet = settings.progressionEnabled ? progressionBet(units, game.rules, game.bankroll) : 0;
   const pendingTotal = Object.values(pendingBets).reduce((sum, amount) => sum + (amount ?? 0), 0);
   const profit = sessionProfit(game);
@@ -122,9 +132,10 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
     const current = settingsRef.current;
     if (!current.progressionEnabled) return '';
     const roundProfit = state.history[state.history.length - 1]?.profit ?? 0;
-    const next = nextStep(current.bettingStrategy, stepRef.current, roundProfit);
+    const resolved = resolveStrategy(current.bettingStrategy, customsRef.current);
+    const next = resolved.nextStep(stepRef.current, roundProfit);
     applyStep(next);
-    const nextUnits = unitsForStep(current.bettingStrategy, next, current.progressionMaxUnits);
+    const nextUnits = resolved.unitsForStep(next, current.progressionMaxUnits);
     const nextBet = progressionBet(nextUnits, state.rules, state.bankroll);
     if (roundProfit === 0) return `Push — next bet unchanged ($${nextBet}).`;
     return `${roundProfit > 0 ? 'Win' : 'Loss'} — next bet $${nextBet} (${nextUnits}u).`;
@@ -174,7 +185,7 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
     if (!watchingRef.current) return;
     const current = settingsRef.current;
     const amount = current.progressionEnabled
-      ? progressionBet(unitsForStep(current.bettingStrategy, stepRef.current, current.progressionMaxUnits), state.rules, state.bankroll)
+      ? progressionBet(resolveStrategy(current.bettingStrategy, customsRef.current).unitsForStep(stepRef.current, current.progressionMaxUnits), state.rules, state.bankroll)
       : Math.min(Object.values(state.lastBets).reduce((sum, value) => sum + (value ?? 0), 0) || state.rules.tableMinimum, state.bankroll);
     if (amount < state.rules.tableMinimum) { stopWatching('Auto-play stopped: bankroll below table minimum.'); return; }
     const result = playRound(state, { [current.betSide]: amount });
@@ -232,7 +243,7 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
                   <Text style={[styles.handLabel, { color: bacColors.playerBlue }]}>PLAYER{showHands ? ` · ${baccaratTotal(game.playerCards)}` : ''}</Text>
                   <View style={styles.handCards}>
                     {showHands
-                      ? game.playerCards.map((item, index) => <View key={index} style={[styles.cardSlot, { marginLeft: index === 0 ? 0 : -26 }]}><CardFace card={item} /></View>)
+                      ? game.playerCards.map((item, index) => <DealtCard key={index} index={index} style={[styles.cardSlot, { marginLeft: index === 0 ? 0 : -26 }]}><CardFace card={item} /></DealtCard>)
                       : <Text style={styles.placeholder}>—</Text>}
                   </View>
                   {showHands && game.outcome === 'player' ? <Text style={[styles.winBadge, { color: bacColors.playerBlue, borderColor: bacColors.playerBlue }]}>WINS</Text> : null}
@@ -242,7 +253,7 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
                   <Text style={[styles.handLabel, { color: bacColors.bankerRed }]}>BANKER{showHands ? ` · ${baccaratTotal(game.bankerCards)}` : ''}</Text>
                   <View style={styles.handCards}>
                     {showHands
-                      ? game.bankerCards.map((item, index) => <View key={index} style={[styles.cardSlot, { marginLeft: index === 0 ? 0 : -26 }]}><CardFace card={item} /></View>)
+                      ? game.bankerCards.map((item, index) => <DealtCard key={index} index={index + 1} style={[styles.cardSlot, { marginLeft: index === 0 ? 0 : -26 }]}><CardFace card={item} /></DealtCard>)
                       : <Text style={styles.placeholder}>—</Text>}
                   </View>
                   {showHands && game.outcome === 'banker' ? <Text style={[styles.winBadge, { color: bacColors.bankerRed, borderColor: bacColors.bankerRed }]}>WINS</Text> : null}
@@ -304,7 +315,7 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
 
         {showPanel ? <ScrollView style={styles.sidePanel} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={game.profitSeries} title="SESSION P/L" pointLabel="Coup" palette={CHART_PALETTE} />
-          <BeadRoad road={game.beadRoad} />
+          <BeadRoad road={game.beadRoad} shoeNumber={game.shoeNumber} />
           <Text style={styles.panelSubtitle}>Coup history</Text>
           {recentRounds.length === 0 ? <Text style={styles.empty}>No coups yet.</Text> : recentRounds.map((round) => (
             <View key={round.index} style={styles.historyRow}>

@@ -1,3 +1,4 @@
+import { CustomBettingStrategy, StepAction } from '../casino/customStrategies';
 import { BlackjackRules } from './types';
 
 export type BettingStrategyId = 'winPress' | 'flat' | 'paroli' | 'oneThreeTwoSix' | 'martingale';
@@ -50,4 +51,44 @@ export function nextStep(strategy: BettingStrategyId, step: number, roundProfit:
 // clamp to table max and bankroll; a result below table minimum means don't deal
 export function progressionBet(units: number, rules: Pick<BlackjackRules, 'tableMinimum' | 'tableMaximum'>, bankroll: number): number {
   return Math.max(0, Math.min(units * rules.tableMinimum, rules.tableMaximum, bankroll));
+}
+
+export interface ResolvedStrategy {
+  id: string;
+  name: string;
+  short: string;
+  description: string;
+  unitsForStep(step: number, maxUnits: number): number;
+  nextStep(step: number, roundProfit: number): number;
+}
+
+function applyAction(action: StepAction, step: number, length: number, loop: boolean): number {
+  switch (action) {
+    case 'reset': return 0;
+    case 'hold': return step;
+    case 'stepBack': return Math.max(0, step - 1);
+    case 'advance': return loop ? (step + 1) % length : Math.min(step + 1, length - 1);
+  }
+}
+
+// presets and user-defined ladders behind one interface; unknown ids fall back to win press
+export function resolveStrategy(id: string, customs: CustomBettingStrategy[]): ResolvedStrategy {
+  const custom = customs.find((item) => item.id === id);
+  if (custom) {
+    const length = custom.sequence.length;
+    return {
+      id: custom.id,
+      name: custom.name,
+      short: custom.name.toUpperCase().slice(0, 10),
+      description: `Custom ladder ${custom.sequence.join('-')} · win: ${custom.onWin} · loss: ${custom.onLoss}${custom.loop ? ' · loops' : ''}. Push holds.`,
+      unitsForStep: (step, maxUnits) => Math.min(custom.sequence[Math.min(Math.max(step, 0), length - 1)], Math.max(1, maxUnits)),
+      nextStep: (step, roundProfit) => roundProfit === 0 ? step : applyAction(roundProfit > 0 ? custom.onWin : custom.onLoss, Math.min(step, length - 1), length, custom.loop),
+    };
+  }
+  const preset = BETTING_STRATEGIES.find((item) => item.id === id) ?? BETTING_STRATEGIES[0];
+  return {
+    ...preset,
+    unitsForStep: (step, maxUnits) => unitsForStep(preset.id, step, maxUnits),
+    nextStep: (step, roundProfit) => nextStep(preset.id, step, roundProfit),
+  };
 }

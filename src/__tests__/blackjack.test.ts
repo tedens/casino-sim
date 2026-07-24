@@ -1,4 +1,5 @@
-import { nextStep, progressionBet, unitsForStep } from '../blackjack/betting';
+import { nextStep, progressionBet, resolveStrategy, unitsForStep } from '../blackjack/betting';
+import { CustomBettingStrategy } from '../casino/customStrategies';
 import { availableActions, createBlackjackState, handValue, isBlackjack, playerAction, sessionProfit, startRound } from '../blackjack/engine';
 import { decide, hintFor, strategyChart } from '../blackjack/strategy';
 import { BlackjackState, Card, Rank } from '../blackjack/types';
@@ -198,6 +199,22 @@ describe('ai table players', () => {
     expect(createBlackjackState({ seed: 'clamp', rules: { aiPlayers: 12 } }).rules.aiPlayers).toBe(5);
   });
 
+  test('bot bankrolls persist across rounds and track losses', () => {
+    // dealer blackjack ends the round instantly; every seat loses its minimum bet
+    const state = rig(freshState({ aiPlayers: 1 }), ['5', '9', 'A', '7', 'K', 'K']);
+    const result = startRound(state, 25).state;
+    expect(result.phase).toBe('settled');
+    expect(result.botRoster[0]).toMatchObject({ name: 'P1', bankroll: 995, friends: 0 });
+  });
+
+  test('a broke bot borrows a fresh stake from a friend', () => {
+    let state = rig(freshState({ aiPlayers: 1 }), ['5', '9', 'A', '7', 'K', 'K']);
+    state = { ...state, botRoster: [{ name: 'P1', bankroll: 4, friends: 0 }] };
+    const result = startRound(state, 25).state;
+    expect(result.botRoster[0]).toMatchObject({ bankroll: 1000, friends: 1 });
+    expect(result.events.some((event) => event.includes('borrows'))).toBe(true);
+  });
+
   test('same seed deals identical ai hands', () => {
     const first = startRound(createBlackjackState({ seed: 'det', rules: { aiPlayers: 4 } }), 25).state;
     const second = startRound(createBlackjackState({ seed: 'det', rules: { aiPlayers: 4 } }), 25).state;
@@ -244,6 +261,31 @@ describe('betting strategies', () => {
     expect(unitsForStep('flat', 0, 8)).toBe(1);
     expect(unitsForStep('flat', 5, 8)).toBe(1);
     expect(nextStep('flat', 3, 25)).toBe(0);
+  });
+
+  test('custom ladders resolve with win/loss actions and loop control', () => {
+    const ladder: CustomBettingStrategy = { id: 'custom-a', name: 'My ladder', sequence: [1, 3, 7], onWin: 'advance', onLoss: 'reset', loop: false };
+    const resolved = resolveStrategy('custom-a', [ladder]);
+    expect([0, 1, 2, 5].map((step) => resolved.unitsForStep(step, 8))).toEqual([1, 3, 7, 7]);
+    expect(resolved.unitsForStep(2, 5)).toBe(5); // max-units cap still applies
+    expect(resolved.nextStep(0, 25)).toBe(1);
+    expect(resolved.nextStep(2, 25)).toBe(2); // holds at the end without loop
+    expect(resolved.nextStep(1, -25)).toBe(0);
+    expect(resolved.nextStep(1, 0)).toBe(1); // push holds
+
+    const looping = resolveStrategy('custom-b', [{ ...ladder, id: 'custom-b', sequence: [1, 2], loop: true }]);
+    expect(looping.nextStep(1, 25)).toBe(0);
+
+    const dalembert = resolveStrategy('custom-c', [{ ...ladder, id: 'custom-c', sequence: [1, 2, 3, 4], onWin: 'stepBack', onLoss: 'advance' }]);
+    expect(dalembert.nextStep(2, -25)).toBe(3);
+    expect(dalembert.nextStep(2, 25)).toBe(1);
+    expect(dalembert.nextStep(0, 25)).toBe(0);
+  });
+
+  test('unknown strategy ids fall back to win press', () => {
+    const resolved = resolveStrategy('custom-deleted', []);
+    expect(resolved.id).toBe('winPress');
+    expect(resolved.nextStep(0, 25)).toBe(1);
   });
 
   test('bet is units × table minimum, clamped to table max and bankroll', () => {

@@ -68,24 +68,35 @@ export function DiceThrow({ faces, rolling, returning = false, duration = 900, w
     y2.value = height * 0.58;
     spin1.value = 0;
     spin2.value = 0;
+    // one continuous throw: accelerate toward the wall, decelerate to the spot (velocity matches at the seam)
+    const fly = duration * 0.55;
+    const settle = duration * 0.45;
+    const rest1x = landing.first.x * width;
+    const rest1y = landing.first.y * height;
+    const rest2x = landing.second.x * width;
+    const rest2y = landing.second.y * height;
     x1.value = withSequence(
-      withTiming(landing.wallX * width, { duration: duration * 0.56, easing: Easing.out(Easing.quad) }),
-      withTiming(landing.first.x * width, { duration: duration * 0.44, easing: Easing.out(Easing.cubic) }),
+      withTiming(landing.wallX * width, { duration: fly, easing: Easing.in(Easing.quad) }),
+      withTiming(rest1x, { duration: settle, easing: Easing.out(Easing.cubic) }),
     );
+    // parabola up to the apex, then a single soft overshoot-and-settle drop (no hard bounce)
     y1.value = withSequence(
-      withTiming(22, { duration: duration * 0.56, easing: Easing.inOut(Easing.quad) }),
-      withTiming(landing.first.y * height, { duration: duration * 0.44, easing: Easing.out(Easing.bounce) }),
+      withTiming(24, { duration: fly, easing: Easing.out(Easing.quad) }),
+      withTiming(rest1y + 10, { duration: settle * 0.7, easing: Easing.in(Easing.quad) }),
+      withTiming(rest1y, { duration: settle * 0.3, easing: Easing.out(Easing.quad) }),
     );
-    x2.value = withSequence(
-      withDelay(35, withTiming((landing.wallX - 0.05) * width, { duration: duration * 0.52, easing: Easing.out(Easing.quad) })),
-      withTiming(landing.second.x * width, { duration: duration * 0.43, easing: Easing.out(Easing.cubic) }),
-    );
-    y2.value = withSequence(
-      withDelay(35, withTiming(32, { duration: duration * 0.52, easing: Easing.inOut(Easing.quad) })),
-      withTiming(landing.second.y * height, { duration: duration * 0.43, easing: Easing.out(Easing.bounce) }),
-    );
-    spin1.value = withTiming(765, { duration, easing: Easing.out(Easing.cubic) });
-    spin2.value = withDelay(25, withTiming(-690, { duration: duration - 25, easing: Easing.out(Easing.cubic) }));
+    x2.value = withDelay(35, withSequence(
+      withTiming((landing.wallX - 0.05) * width, { duration: fly, easing: Easing.in(Easing.quad) }),
+      withTiming(rest2x, { duration: settle, easing: Easing.out(Easing.cubic) }),
+    ));
+    y2.value = withDelay(35, withSequence(
+      withTiming(34, { duration: fly, easing: Easing.out(Easing.quad) }),
+      withTiming(rest2y + 10, { duration: settle * 0.7, easing: Easing.in(Easing.quad) }),
+      withTiming(rest2y, { duration: settle * 0.3, easing: Easing.out(Easing.quad) }),
+    ));
+    // spin decelerates in lockstep with the travel so rotation and motion stop together
+    spin1.value = withTiming(720, { duration, easing: Easing.out(Easing.cubic) });
+    spin2.value = withDelay(25, withTiming(-660, { duration: duration - 25, easing: Easing.out(Easing.cubic) }));
   }, [duration, height, landing, returning, rolling, spin1, spin2, width, x1, x2, y1, y2]);
 
   const firstStyle = useAnimatedStyle(() => ({

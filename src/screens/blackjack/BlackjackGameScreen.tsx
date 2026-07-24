@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { BETTING_STRATEGIES, nextStep, progressionBet, unitsForStep } from '../../blackjack/betting';
+import { progressionBet, resolveStrategy } from '../../blackjack/betting';
+import { CustomBettingStrategy, loadCustomStrategies } from '../../casino/customStrategies';
 import { availableActions, cardText, cardValue, createBlackjackState, handLabel, handValue, isBust, playerAction, sessionProfit, startRound } from '../../blackjack/engine';
 import { BlackjackSettings } from '../../blackjack/storage';
 import { hintFor } from '../../blackjack/strategy';
@@ -9,6 +10,7 @@ import { BlackjackHand, BlackjackState, Card, PlayerAction } from '../../blackja
 import { createManualSeed } from '../../domain/rng';
 import { Button, Chip, ChipStack, Money, formatMoney } from '../../ui/components';
 import { ChartPalette, ProfitChart } from '../../ui/ProfitChart';
+import { DealtCard } from '../../ui/DealtCard';
 
 const CHART_PALETTE: ChartPalette = {
   background: bjColors.background,
@@ -58,7 +60,7 @@ function AiHandView({ hand }: { hand: BlackjackHand }) {
   const status = hand.surrendered ? 'SURR' : isBust(hand.cards) ? 'BUST' : hand.doubled ? `${handValue(hand.cards).total} ×2` : String(handValue(hand.cards).total);
   return (
     <View style={styles.aiHand}>
-      <View style={styles.handCards}>{hand.cards.map((card, index) => <View key={index} style={{ marginLeft: index === 0 ? 0 : -22 }}><PlayingCard card={card} compact /></View>)}</View>
+      <View style={styles.handCards}>{hand.cards.map((card, index) => <DealtCard key={index} index={index} style={{ marginLeft: index === 0 ? 0 : -22 }}><PlayingCard card={card} compact /></DealtCard>)}</View>
       <Text style={[styles.aiTotal, outcome && { color: outcome.color }]}>{outcome ? `${status} · ${outcome.text}` : status}</Text>
     </View>
   );
@@ -68,7 +70,7 @@ function HandView({ hand, active, showTotal }: { hand: BlackjackHand; active: bo
   const outcome = hand.outcome ? OUTCOME_STYLE[hand.outcome] : undefined;
   return (
     <View style={[styles.handBox, active && styles.activeHandBox]}>
-      <View style={styles.handCards}>{hand.cards.map((card, index) => <View key={index} style={[styles.handCardSlot, { marginLeft: index === 0 ? 0 : -30 }]}><PlayingCard card={card} /></View>)}</View>
+      <View style={styles.handCards}>{hand.cards.map((card, index) => <DealtCard key={index} index={index} style={[styles.handCardSlot, { marginLeft: index === 0 ? 0 : -30 }]}><PlayingCard card={card} /></DealtCard>)}</View>
       {showTotal ? <Text style={[styles.handTotal, isBust(hand.cards) && styles.bustTotal]}>{handLabel(hand.cards)}{hand.doubled ? ' · DOUBLED' : ''}{hand.surrendered ? ' · SURRENDERED' : ''}</Text> : null}
       <View style={styles.handMeta}>
         <ChipStack amount={hand.bet} size="compact" />
@@ -109,8 +111,14 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
   const watchDelayRef = useRef(750);
   const watchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const stepRef = useRef(0);
+  const [customs, setCustoms] = useState<CustomBettingStrategy[]>([]);
+  const customsRef = useRef<CustomBettingStrategy[]>([]);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  useEffect(() => {
+    loadCustomStrategies().then((loaded) => { customsRef.current = loaded; setCustoms(loaded); }).catch(() => undefined);
+  }, []);
 
   const applyStep = (value: number) => {
     stepRef.current = value;
@@ -135,8 +143,8 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
   const profit = sessionProfit(game);
   // once chips go down after a settled round, clear the old cards off the felt
   const freshBetting = betting && (game.hands.length === 0 || pendingBet > 0);
-  const strategy = BETTING_STRATEGIES.find((item) => item.id === settings.bettingStrategy) ?? BETTING_STRATEGIES[0];
-  const units = unitsForStep(strategy.id, step, settings.progressionMaxUnits);
+  const strategy = resolveStrategy(settings.bettingStrategy, customs);
+  const units = strategy.unitsForStep(step, settings.progressionMaxUnits);
   const autoBet = settings.progressionEnabled ? progressionBet(units, game.rules, game.bankroll) : 0;
   const dealAmount = pendingBet > 0 ? pendingBet : autoBet;
 
@@ -145,9 +153,10 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
     const current = settingsRef.current;
     if (state.phase !== 'settled' || !current.progressionEnabled) return '';
     const roundProfit = state.history[state.history.length - 1]?.profit ?? 0;
-    const next = nextStep(current.bettingStrategy, stepRef.current, roundProfit);
+    const resolved = resolveStrategy(current.bettingStrategy, customsRef.current);
+    const next = resolved.nextStep(stepRef.current, roundProfit);
     applyStep(next);
-    const nextUnits = unitsForStep(current.bettingStrategy, next, current.progressionMaxUnits);
+    const nextUnits = resolved.unitsForStep(next, current.progressionMaxUnits);
     const nextBet = progressionBet(nextUnits, state.rules, state.bankroll);
     if (roundProfit === 0) return `Push — next bet unchanged ($${nextBet}).`;
     return `${roundProfit > 0 ? 'Win' : 'Loss'} — next bet $${nextBet} (${nextUnits}u).`;
@@ -174,7 +183,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
     } else {
       const current = settingsRef.current;
       const bet = current.progressionEnabled
-        ? progressionBet(unitsForStep(current.bettingStrategy, stepRef.current, current.progressionMaxUnits), state.rules, state.bankroll)
+        ? progressionBet(resolveStrategy(current.bettingStrategy, customsRef.current).unitsForStep(stepRef.current, current.progressionMaxUnits), state.rules, state.bankroll)
         : Math.min(state.lastBet || state.rules.tableMinimum, state.bankroll);
       if (bet < state.rules.tableMinimum) { stopWatching('Auto-play stopped: bankroll below table minimum.'); return; }
       const result = startRound(state, bet);
@@ -266,18 +275,25 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
                 <View style={styles.dealerCards}>
                   {game.dealer.length === 0 || freshBetting
                     ? <Text style={styles.placeholder}>Waiting on a bet…</Text>
-                    : game.dealer.map((card, index) => <View key={index} style={[styles.handCardSlot, { marginLeft: index === 0 ? 0 : -30 }]}><PlayingCard card={card} faceDown={index === 1 && !game.holeRevealed} /></View>)}
+                    : game.dealer.map((card, index) => <DealtCard key={index} index={index} style={[styles.handCardSlot, { marginLeft: index === 0 ? 0 : -30 }]}><PlayingCard card={card} faceDown={index === 1 && !game.holeRevealed} /></DealtCard>)}
                 </View>
               </View>
               <Text style={styles.rulesArc}>{rulesLine}</Text>
               {(game.aiPlayers?.length ?? 0) > 0 && game.hands.length > 0 && !freshBetting ? (
                 <View style={styles.aiRow}>
-                  {game.aiPlayers.map((player) => (
-                    <View key={player.id} style={styles.aiPlayer}>
-                      <Text style={styles.aiName}>{player.name}</Text>
-                      <View style={styles.aiHands}>{player.hands.map((hand) => <AiHandView key={hand.id} hand={hand} />)}</View>
-                    </View>
-                  ))}
+                  {game.aiPlayers.map((player, index) => {
+                    const seat = game.botRoster[index];
+                    return (
+                      <View key={player.id} style={styles.aiPlayer}>
+                        <Text style={styles.aiName}>
+                          {player.name}
+                          {seat ? ` · ${formatMoney(seat.bankroll)}` : ''}
+                          {seat && seat.friends > 0 ? ` · F×${seat.friends}` : ''}
+                        </Text>
+                        <View style={styles.aiHands}>{player.hands.map((hand) => <AiHandView key={hand.id} hand={hand} />)}</View>
+                      </View>
+                    );
+                  })}
                 </View>
               ) : null}
               {hint && activeHand ? (
@@ -356,6 +372,20 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
 
         {showPanel ? <ScrollView style={styles.sidePanel} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={game.profitSeries} title="SESSION P/L" pointLabel="Round" palette={CHART_PALETTE} />
+          {game.botRoster.length > 0 ? (
+            <>
+              <Text style={styles.panelSubtitle}>Table mates</Text>
+              {game.botRoster.map((seat) => (
+                <View key={seat.name} style={styles.seatRow}>
+                  <Text style={styles.seatName}>{seat.name}</Text>
+                  <Text style={[styles.seatProfit, { color: seat.bankroll + seat.friends * game.startingBankroll - game.startingBankroll >= 0 ? bjColors.success : bjColors.danger }]}>
+                    {formatMoney(seat.bankroll + seat.friends * game.startingBankroll - game.startingBankroll, true)}
+                  </Text>
+                  <Text style={styles.seatFriends}>{seat.friends > 0 ? `${seat.friends} friend${seat.friends > 1 ? 's' : ''}` : 'solvent'}</Text>
+                </View>
+              ))}
+            </>
+          ) : null}
           <Text style={styles.panelSubtitle}>Round history</Text>
           {recentRounds.length === 0 ? <Text style={styles.empty}>No rounds yet.</Text> : recentRounds.map((round) => (
             <View key={round.index} style={styles.historyRow}>
@@ -452,6 +482,10 @@ const styles = StyleSheet.create({
   historyBody: { flex: 1, gap: 1 },
   historyCards: { color: bjColors.ink, fontSize: 11 },
   historyProfit: { fontWeight: '900', fontVariant: ['tabular-nums'], fontSize: 12 },
+  seatRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2b3450' },
+  seatName: { color: bjColors.ink, width: 34, fontWeight: '900', fontSize: 12 },
+  seatProfit: { fontWeight: '900', fontVariant: ['tabular-nums'], fontSize: 12, width: 70 },
+  seatFriends: { color: bjColors.muted, fontSize: 11, flex: 1, textAlign: 'right' },
   note: { color: bjColors.muted, lineHeight: 19, fontSize: 12 },
   seed: { color: '#6e7f94', fontSize: 9, marginTop: 8 },
 });

@@ -126,7 +126,7 @@ export default function App() {
             <Text style={styles.diamond}>◆</Text>
             <View>
               <Text style={styles.brandText}>{activeLab.title}</Text>
-              <Text style={[styles.brandCaret, blue && styles.brandCaretBlue]}>{labMenuOpen ? 'CLOSE ▴' : 'SWITCH ▾'}</Text>
+              <Text style={[styles.brandCaret, blue && styles.brandCaretBlue]}>{labMenuOpen ? 'CLOSE ▴' : `${LABS.length} GAMES ▾`}</Text>
             </View>
           </Pressable>
           {nav.map((item) => (
@@ -136,7 +136,7 @@ export default function App() {
               style={[styles.navItem, activeScreen === item.id && (blue ? styles.navItemActiveBlue : wine ? styles.navItemActiveWine : styles.navItemActive)]}
             >
               <Text style={[styles.navShort, blue && styles.navShortBlue, wine && styles.navShortWine, activeScreen === item.id && styles.navTextActive]}>{item.short}</Text>
-              <Text style={[styles.navLabel, blue && styles.navLabelBlue, wine && styles.navLabelWine, activeScreen === item.id && styles.navTextActive]}>{item.label}</Text>
+              {item.label.toUpperCase() !== item.short ? <Text style={[styles.navLabel, blue && styles.navLabelBlue, wine && styles.navLabelWine, activeScreen === item.id && styles.navTextActive]}>{item.label}</Text> : null}
             </Pressable>
           ))}
           <View style={styles.offline}><View style={styles.offlineDot} /><Text style={styles.offlineText}>OFFLINE</Text></View>
@@ -157,7 +157,7 @@ export default function App() {
           <>
             <Pressable style={styles.menuBackdrop} onPress={() => setLabMenuOpen(false)} accessibilityLabel="Close lab menu" />
             <View style={styles.labMenu}>
-              <Text style={styles.labMenuTitle}>LAB SIMULATORS</Text>
+              <Text style={styles.labMenuTitle}>CHOOSE A GAME · {LABS.length} TABLES</Text>
               {LABS.map((item) => (
                 <Pressable key={item.id} onPress={() => switchLab(item.id)} style={[styles.labOption, item.id === 'blackjack' ? styles.labOptionBlue : item.id === 'baccarat' ? styles.labOptionWine : styles.labOptionGreen, lab === item.id && styles.labOptionActive]}>
                   <Text style={styles.labOptionTitle}>{item.title.replace('\n', '')}</Text>

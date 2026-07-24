@@ -52,7 +52,7 @@ export interface BaccaratState {
   history: BaccaratRoundRecord[];
   /** cumulative profit per settled round, uncapped (feeds the session graph) */
   profitSeries: number[];
-  /** compact outcome sequence for the bead road, uncapped */
+  /** outcome sequence for the current shoe's bead road; resets on every reshuffle */
   beadRoad: BaccaratOutcome[];
   events: string[];
 }

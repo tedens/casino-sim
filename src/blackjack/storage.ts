@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BettingStrategyId } from './betting';
 
 const SETTINGS_KEY = '@blackjack-lab/settings/v1';
 
@@ -15,7 +14,8 @@ export interface BlackjackSettings {
   showHints: boolean;
   progressionEnabled: boolean;
   progressionMaxUnits: number;
-  bettingStrategy: BettingStrategyId;
+  /** preset id or a custom strategy id */
+  bettingStrategy: string;
   aiPlayers: number;
   insureTwentyVsAce: boolean;
 }

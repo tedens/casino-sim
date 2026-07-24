@@ -1,7 +1,7 @@
 import { decide } from './basicStrategy';
 import { cardValue, handValue, isBust } from './cards';
 import { freshShoe, rotatedShoe } from '../casino/shoe';
-import { AiPlayer, BlackjackHand, BlackjackRules, BlackjackState, Card, HandOutcome, PlayerAction } from './types';
+import { AiPlayer, BlackjackHand, BlackjackRules, BlackjackState, BotSeat, Card, HandOutcome, PlayerAction } from './types';
 
 export { cardText, cardValue, handLabel, handValue, isBust } from './cards';
 
@@ -60,6 +60,7 @@ export function createBlackjackState(options: { seed: string; startingBankroll?:
     hands: [],
     activeHand: 0,
     aiPlayers: [],
+    botRoster: Array.from({ length: rules.aiPlayers }, (_, i) => ({ name: `P${i + 1}`, bankroll, friends: 0 })),
     insurance: null,
     dealer: [],
     holeRevealed: false,
@@ -174,10 +175,9 @@ export function startRound(state: BlackjackState, bet: number): { state: Blackja
   };
 
   // deal order: seats, then player, then dealer, twice around
-  const aiCount = Math.max(0, Math.min(MAX_AI_PLAYERS, next.rules.aiPlayers));
-  const aiPlayers: AiPlayer[] = Array.from({ length: aiCount }, (_, i) => ({
+  const aiPlayers: AiPlayer[] = next.botRoster.map((seat, i) => ({
     id: `r${roundIndex}-p${i + 1}`,
-    name: `P${i + 1}`,
+    name: seat.name,
     hands: [newHand(`r${roundIndex}-p${i + 1}-h1`, next.rules.tableMinimum, [take()])],
   }));
   const playerFirst = take();
@@ -360,6 +360,25 @@ function settleRound(state: BlackjackState): BlackjackState {
     ...player,
     hands: player.hands.map((hand) => ({ ...hand, stood: true, outcome: handOutcome(hand, dealerValue.total, dealerBust, dealerBlackjack) })),
   }));
+  const botRoster: BotSeat[] = next.botRoster.map((seat, index) => {
+    const player = settledAi[index];
+    if (!player) return seat;
+    const net = player.hands.reduce((sum, hand) => {
+      const stake = hand.bet * (hand.doubled ? 2 : 1);
+      const returned = hand.outcome === 'blackjack' ? hand.bet * (1 + next.rules.blackjackPayout)
+        : hand.outcome === 'win' ? stake * 2
+        : hand.outcome === 'push' ? stake
+        : hand.outcome === 'surrender' ? stake / 2
+        : 0;
+      return sum + returned - stake;
+    }, 0);
+    let updated = { ...seat, bankroll: seat.bankroll + net };
+    if (updated.bankroll < next.rules.tableMinimum) {
+      updated = { ...updated, bankroll: next.startingBankroll, friends: updated.friends + 1 };
+      events.push(`${seat.name} is broke — borrows another $${next.startingBankroll} from a friend (+1).`);
+    }
+    return updated;
+  });
 
   const insuranceNet = next.insurance?.result === 'won' ? next.insurance.stake * INSURANCE_PAYOUT
     : next.insurance?.result === 'lost' ? -next.insurance.stake
@@ -377,6 +396,7 @@ function settleRound(state: BlackjackState): BlackjackState {
     bankroll,
     hands: settled,
     aiPlayers: settledAi,
+    botRoster,
     phase: 'settled',
     events,
     history: [...next.history, record].slice(-60),

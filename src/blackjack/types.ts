@@ -46,6 +46,13 @@ export interface AiPlayer {
   hands: BlackjackHand[];
 }
 
+export interface BotSeat {
+  name: string;
+  bankroll: number;
+  /** fresh stakes borrowed after going broke */
+  friends: number;
+}
+
 export type BlackjackPhase = 'betting' | 'player' | 'settled';
 
 export interface RoundRecord {
@@ -72,6 +79,8 @@ export interface BlackjackState {
   hands: BlackjackHand[];
   activeHand: number;
   aiPlayers: AiPlayer[];
+  /** persistent bot bankrolls, parallel to the ai seats */
+  botRoster: BotSeat[];
   /** insurance side bet, resolved at the dealer peek */
   insurance: { stake: number; result?: 'won' | 'lost' } | null;
   dealer: Card[];

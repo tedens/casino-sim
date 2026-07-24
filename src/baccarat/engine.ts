@@ -184,7 +184,8 @@ export function playRound(state: BaccaratState, bets: Partial<Record<BaccaratBet
       lastBets: Object.fromEntries(staked),
       history: [...next.history, record].slice(-60),
       profitSeries: [...next.profitSeries, record.cumulative],
-      beadRoad: [...next.beadRoad, outcome],
+      // a reshuffle (cut card or exhaustion) starts a fresh road for the new shoe
+      beadRoad: shoeNumber !== state.shoeNumber ? [outcome] : [...next.beadRoad, outcome],
       events,
     },
   };

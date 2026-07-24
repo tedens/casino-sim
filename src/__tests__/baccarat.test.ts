@@ -45,6 +45,36 @@ describe('baccarat tableau', () => {
     expect(result.outcome).toBe('tie'); // 3 vs 3
   });
 
+  test('banker 4 stands against a player third outside 2-7', () => {
+    // P 2+3=5 draws an ace (value 1); B 2+2=4 must stand against it
+    const result = playRound(rig(fresh(), ['2', '2', '3', '2', 'A']), { player: 25 }).state;
+    expect(result.playerCards).toHaveLength(3);
+    expect(result.bankerCards).toHaveLength(2);
+  });
+
+  test('banker 5 draws on player third 4-7 and stands otherwise', () => {
+    // P 2+3=5 draws a 3; B A+4=5 stands against a 3
+    const stands = playRound(rig(fresh(), ['2', 'A', '3', '4', '3']), { player: 25 }).state;
+    expect(stands.bankerCards).toHaveLength(2);
+    // P 2+3=5 draws a 4; B A+4=5 draws against a 4
+    const draws = playRound(rig(fresh(), ['2', 'A', '3', '4', '4', '9']), { player: 25 }).state;
+    expect(draws.bankerCards).toHaveLength(3);
+  });
+
+  test('banker 7 always stands even when the player drew', () => {
+    const result = playRound(rig(fresh(), ['2', '3', '3', '4', '9']), { player: 25 }).state;
+    expect(result.playerCards).toHaveLength(3); // 5 draws
+    expect(result.bankerCards).toHaveLength(2); // 7 stands
+  });
+
+  test('banker natural freezes the player even on a drawable total', () => {
+    // P 2+3=5 would draw, but B 4+5=9 is a natural
+    const result = playRound(rig(fresh(), ['2', '4', '3', '5']), { player: 25 }).state;
+    expect(result.playerCards).toHaveLength(2);
+    expect(result.bankerCards).toHaveLength(2);
+    expect(result.outcome).toBe('banker');
+  });
+
   test('banker 6 draws only against a player third of 6 or 7', () => {
     const result = playRound(rig(fresh(), ['2', 'K', '2', '6', '6', '2']), { banker: 25 }).state;
     expect(result.playerCards).toHaveLength(3); // 4 draws a 6 to 0
@@ -87,6 +117,16 @@ describe('baccarat shoe', () => {
     const first = playRound(createBaccaratState({ seed: 'coup' }), { player: 25 }).state;
     const second = playRound(createBaccaratState({ seed: 'coup' }), { player: 25 }).state;
     expect(second.history[0]).toEqual(first.history[0]);
+  });
+
+  test('bead road covers the whole shoe and resets on rotation', () => {
+    let state = playRound(createBaccaratState({ seed: 'road' }), { player: 25 }).state;
+    state = playRound(state, { player: 25 }).state;
+    expect(state.beadRoad).toHaveLength(2);
+    state = { ...state, shoe: state.shoe.slice(0, state.reshuffleAt) };
+    state = playRound(state, { player: 25 }).state;
+    expect(state.shoeNumber).toBe(2);
+    expect(state.beadRoad).toHaveLength(1); // new shoe, fresh road
   });
 
   test('cut card rotates to a fresh shoe seed like blackjack', () => {

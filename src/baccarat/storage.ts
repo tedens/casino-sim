@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BettingStrategyId } from '../blackjack/betting';
 import { BaccaratBetKind } from './types';
 
 const SETTINGS_KEY = '@baccarat-lab/settings/v1';
@@ -11,7 +10,8 @@ export interface BaccaratSettings {
   decks: number;
   progressionEnabled: boolean;
   progressionMaxUnits: number;
-  bettingStrategy: BettingStrategyId;
+  /** preset id or a custom strategy id */
+  bettingStrategy: string;
   /** the spot the auto bet rides on */
   betSide: BaccaratBetKind;
 }

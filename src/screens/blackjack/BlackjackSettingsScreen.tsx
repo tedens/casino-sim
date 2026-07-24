@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { BETTING_STRATEGIES, BettingStrategyId } from '../../blackjack/betting';
+import { BETTING_STRATEGIES } from '../../blackjack/betting';
+import { CustomBettingStrategy, loadCustomStrategies, saveCustomStrategies } from '../../casino/customStrategies';
+import { CustomStrategyEditor } from '../../ui/CustomStrategyEditor';
 import { BlackjackSettings } from '../../blackjack/storage';
 import { bjColors } from '../../blackjack/theme';
 import { Button, Field, SectionTitle } from '../../ui/components';
@@ -29,10 +31,21 @@ export function BlackjackSettingsScreen({ settings, onSave }: { settings: Blackj
   const [showHints, setShowHints] = useState(settings.showHints);
   const [progression, setProgression] = useState(settings.progressionEnabled);
   const [maxUnits, setMaxUnits] = useState(String(settings.progressionMaxUnits));
-  const [bettingStrategy, setBettingStrategy] = useState<BettingStrategyId>(settings.bettingStrategy);
+  const [bettingStrategy, setBettingStrategy] = useState<string>(settings.bettingStrategy);
+  const [customs, setCustoms] = useState<CustomBettingStrategy[]>([]);
   const [aiPlayers, setAiPlayers] = useState(settings.aiPlayers);
   const [insureTwenty, setInsureTwenty] = useState(settings.insureTwentyVsAce);
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    loadCustomStrategies().then(setCustoms).catch(() => undefined);
+  }, []);
+
+  const changeCustoms = (next: CustomBettingStrategy[]) => {
+    setCustoms(next);
+    saveCustomStrategies(next).catch(() => undefined);
+    if (!next.some((item) => item.id === bettingStrategy) && bettingStrategy.startsWith('custom-')) setBettingStrategy('winPress');
+  };
 
   useEffect(() => {
     setBankroll(String(settings.startingBankroll));
@@ -104,8 +117,10 @@ export function BlackjackSettingsScreen({ settings, onSave }: { settings: Blackj
         <SectionTitle>Betting strategy</SectionTitle>
         <Toggle label="Auto bet sizing" value={progression} onToggle={() => setProgression((value) => !value)} note="1 unit = table minimum. The deal button auto-sizes the next bet from the selected strategy; stacking chips manually overrides it for that round. Also toggleable from the table." />
         <Text style={styles.label}>STRATEGY</Text>
-        <View style={styles.choicesWrap}>{BETTING_STRATEGIES.map((item) => <Button key={item.id} label={item.name.toUpperCase()} variant={bettingStrategy === item.id ? 'primary' : 'ghost'} onPress={() => setBettingStrategy(item.id)} style={bettingStrategy !== item.id && styles.blueGhost} />)}</View>
-        <Text style={styles.note}>{BETTING_STRATEGIES.find((item) => item.id === bettingStrategy)?.description} Push always holds the bet.</Text>
+        <View style={styles.choicesWrap}>{[...BETTING_STRATEGIES, ...customs].map((item) => <Button key={item.id} label={item.name.toUpperCase()} variant={bettingStrategy === item.id ? 'primary' : 'ghost'} onPress={() => setBettingStrategy(item.id)} style={bettingStrategy !== item.id && styles.blueGhost} />)}</View>
+        <Text style={styles.note}>{BETTING_STRATEGIES.find((item) => item.id === bettingStrategy)?.description ?? 'Custom strategy — see its ladder below.'} Push always holds the bet.</Text>
+        <Text style={styles.label}>CUSTOM STRATEGIES</Text>
+        <CustomStrategyEditor customs={customs} onChange={changeCustoms} muted={bjColors.muted} ghostStyle={styles.blueGhost} />
         <View style={styles.fields}>
           <Field label="Max units" value={maxUnits} onChangeText={setMaxUnits} keyboardType="numeric" />
         </View>
