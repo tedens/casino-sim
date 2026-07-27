@@ -116,6 +116,10 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
   const customsRef = useRef<CustomBettingStrategy[]>([]);
   const [overrides, setOverrides] = useState<StrategyOverrides>({});
   const overridesRef = useRef<StrategyOverrides>({});
+  // auto-play deviation tracking: rounds where the edited card diverged from the book, tagged by outcome
+  const [deviationTags, setDeviationTags] = useState<Record<number, 'success' | 'fail' | 'push'>>({});
+  const deviationTagsRef = useRef<Record<number, 'success' | 'fail' | 'push'>>({});
+  const roundDeviatedRef = useRef(false);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
@@ -173,13 +177,28 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
     setMessage(text);
   };
 
-  // one auto-play tick: deal between rounds, otherwise play the active hand by the book
+  // on settle, tag a round where the edited card diverged from the book by its outcome
+  const recordDeviationOutcome = (settled: BlackjackState) => {
+    if (!roundDeviatedRef.current) return;
+    roundDeviatedRef.current = false;
+    const record = settled.history[settled.history.length - 1];
+    if (!record) return;
+    const tag = record.profit > 0 ? 'success' : record.profit < 0 ? 'fail' : 'push';
+    const nextTags = { ...deviationTagsRef.current, [record.index]: tag as 'success' | 'fail' | 'push' };
+    deviationTagsRef.current = nextTags;
+    setDeviationTags(nextTags);
+  };
+
+  // one auto-play tick: deal between rounds, otherwise play the active hand off the edited card
   const autoStep = (state: BlackjackState) => {
     if (!watchingRef.current) return;
     let next = state;
     let note = '';
     if (state.phase === 'player') {
-      const play = hintFor(state);
+      // compare the edited card against the book so we can flag rounds the tweak changed
+      const bookPlay = hintFor(state);
+      const play = hintFor(state, overridesRef.current);
+      if (bookPlay && play && bookPlay.action !== play.action) roundDeviatedRef.current = true;
       const result = playerAction(state, play?.action ?? 'stand');
       if (result.error) { stopWatching(`Auto-play stopped: ${result.error}`); return; }
       next = result.state;
@@ -190,11 +209,13 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
         ? progressionBet(resolveStrategy(current.bettingStrategy, customsRef.current).unitsForStep(stepRef.current, current.progressionMaxUnits), state.rules, state.bankroll)
         : Math.min(state.lastBet || state.rules.tableMinimum, state.bankroll);
       if (bet < state.rules.tableMinimum) { stopWatching('Auto-play stopped: bankroll below table minimum.'); return; }
+      roundDeviatedRef.current = false;
       const result = startRound(state, bet, overridesRef.current);
       if (result.error) { stopWatching(`Auto-play stopped: ${result.error}`); return; }
       next = result.state;
       note = [`Auto: DEAL $${bet}`, ...next.events, settleProgression(next)].filter(Boolean).join(' · ');
     }
+    if (next.phase === 'settled') recordDeviationOutcome(next);
     setGame(next);
     setMessage(note);
     watchTimer.current = setTimeout(() => autoStep(next), watchDelayRef.current);
@@ -215,6 +236,9 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
     setGame(makeState());
     setPendingBet(0);
     applyStep(0);
+    roundDeviatedRef.current = false;
+    deviationTagsRef.current = {};
+    setDeviationTags({});
     setMessage('New shoe ready. Build a bet, then deal.');
   };
 
@@ -255,6 +279,10 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
 
   const rulesLine = `BLACKJACK PAYS ${game.rules.blackjackPayout === 1.5 ? '3 TO 2' : '6 TO 5'} · DEALER ${game.rules.dealerHitsSoft17 ? 'HITS' : 'STANDS ON'} SOFT 17 · ${game.rules.surrenderAllowed ? 'LATE SURRENDER' : 'NO SURRENDER'}${game.rules.insureTwentyVsAce ? ' · INSURES 20 VS ACE' : ''} · ${game.rules.decks} DECKS`;
   const recentRounds = game.history.slice(-10).reverse();
+  const tagValues = Object.values(deviationTags);
+  const tweakWins = tagValues.filter((tag) => tag === 'success').length;
+  const tweakLosses = tagValues.filter((tag) => tag === 'fail').length;
+  const tweakPushes = tagValues.filter((tag) => tag === 'push').length;
 
   return (
     <View style={styles.screen}>
@@ -391,16 +419,31 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
             </>
           ) : null}
           <Text style={styles.panelSubtitle}>Round history</Text>
-          {recentRounds.length === 0 ? <Text style={styles.empty}>No rounds yet.</Text> : recentRounds.map((round) => (
-            <View key={round.index} style={styles.historyRow}>
-              <Text style={styles.historyIndex}>#{round.index}</Text>
-              <View style={styles.historyBody}>
-                <Text style={styles.historyCards} numberOfLines={1}>You: {round.playerSummary}</Text>
-                <Text style={styles.historyCards} numberOfLines={1}>Dealer: {round.dealerSummary}</Text>
-              </View>
-              <Text style={[styles.historyProfit, { color: round.profit > 0 ? bjColors.success : round.profit < 0 ? bjColors.danger : bjColors.muted }]}>{formatMoney(round.profit, true)}</Text>
+          {tagValues.length > 0 ? (
+            <View style={styles.tweakSummary}>
+              <Text style={styles.tweakTitle}>CARD TWEAKS · AUTO-PLAY</Text>
+              <Text style={styles.tweakLine}>
+                <Text style={{ color: bjColors.success }}>{tweakWins} worked</Text>
+                <Text style={styles.tweakDim}>  ·  </Text>
+                <Text style={{ color: bjColors.danger }}>{tweakLosses} backfired</Text>
+                {tweakPushes > 0 ? <Text style={styles.tweakDim}>  ·  {tweakPushes} push</Text> : null}
+              </Text>
+              <Text style={styles.tweakNote}>Rounds where your edited card diverged from the book. Gold rows won, red rows lost — a running read on whether the tweak is paying off.</Text>
             </View>
-          ))}
+          ) : null}
+          {recentRounds.length === 0 ? <Text style={styles.empty}>No rounds yet.</Text> : recentRounds.map((round) => {
+            const tag = deviationTags[round.index];
+            return (
+              <View key={round.index} style={[styles.historyRow, tag === 'success' && styles.tweakWinRow, tag === 'fail' && styles.tweakLossRow]}>
+                <Text style={styles.historyIndex}>#{round.index}{tag ? ' ✎' : ''}</Text>
+                <View style={styles.historyBody}>
+                  <Text style={styles.historyCards} numberOfLines={1}>You: {round.playerSummary}</Text>
+                  <Text style={styles.historyCards} numberOfLines={1}>Dealer: {round.dealerSummary}</Text>
+                </View>
+                <Text style={[styles.historyProfit, { color: round.profit > 0 ? bjColors.success : round.profit < 0 ? bjColors.danger : bjColors.muted }]}>{formatMoney(round.profit, true)}</Text>
+              </View>
+            );
+          })}
           <Text style={styles.panelSubtitle}>Table rules</Text>
           <Text style={styles.note}>{rulesLine.toLowerCase()}</Text>
           <Text style={styles.note}>Dealer peeks for blackjack on a ten or ace up. Split up to {game.rules.maxHands} hands; split aces receive one card. Insurance is never offered — it is always a losing bet.</Text>
@@ -482,6 +525,13 @@ const styles = StyleSheet.create({
   panelSubtitle: { color: bjColors.ink, fontWeight: '900', fontSize: 14, marginTop: 7 },
   empty: { color: bjColors.muted, fontStyle: 'italic' },
   historyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2b3450' },
+  tweakWinRow: { backgroundColor: 'rgba(213,174,83,0.16)', borderLeftWidth: 3, borderLeftColor: bjColors.gold, paddingLeft: 6, borderRadius: 4 },
+  tweakLossRow: { backgroundColor: 'rgba(239,107,100,0.16)', borderLeftWidth: 3, borderLeftColor: bjColors.danger, paddingLeft: 6, borderRadius: 4 },
+  tweakSummary: { padding: 10, borderRadius: 10, backgroundColor: bjColors.background, borderWidth: 1, borderColor: '#3d5c8a', gap: 4 },
+  tweakTitle: { color: bjColors.gold, fontSize: 8, fontWeight: '900', letterSpacing: 1.2 },
+  tweakLine: { fontSize: 14, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  tweakDim: { color: bjColors.muted },
+  tweakNote: { color: bjColors.muted, fontSize: 11, lineHeight: 15 },
   historyIndex: { color: bjColors.muted, width: 34, fontSize: 11 },
   historyBody: { flex: 1, gap: 1 },
   historyCards: { color: bjColors.ink, fontSize: 11 },
