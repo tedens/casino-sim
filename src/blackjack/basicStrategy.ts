@@ -1,23 +1,30 @@
 import { cardValue, handValue } from './cards';
-import { BlackjackRules, Card, PlayerAction } from './types';
+import { Allowed, Hint, cellKey, codeToHint, handCell } from './chart';
+import { StrategyOverrides } from './strategyOverrides';
+import { BlackjackRules, Card } from './types';
 
-export interface Hint {
-  action: PlayerAction;
-  reason: string;
+export type { Allowed, Hint } from './chart';
+
+const hint = (action: Hint['action'], reason: string): Hint => ({ action, reason });
+
+// entry point: a user card override wins when it applies here, otherwise the book plays
+export function decide(cards: Card[], dealerUp: Card, rules: BlackjackRules, allowed: Allowed, overrides?: StrategyOverrides): Hint {
+  if (overrides) {
+    const cell = handCell(cards, dealerUp);
+    if (cell) {
+      const code = overrides[cellKey(cell.section, cell.label, cell.upLabel)];
+      if (code) {
+        const resolved = codeToHint(code, allowed);
+        if (resolved) return resolved;
+      }
+    }
+  }
+  return decideBook(cards, dealerUp, rules, allowed);
 }
-
-export interface Allowed {
-  hit: boolean;
-  double: boolean;
-  split: boolean;
-  surrender: boolean;
-}
-
-const hint = (action: PlayerAction, reason: string): Hint => ({ action, reason });
 
 // multi-deck basic strategy with dealer peek; respects h17/s17, das and surrender rules.
 // `allowed` reflects what the table currently permits, so the result is always playable.
-export function decide(cards: Card[], dealerUp: Card, rules: BlackjackRules, allowed: Allowed): Hint {
+export function decideBook(cards: Card[], dealerUp: Card, rules: BlackjackRules, allowed: Allowed): Hint {
   const up = cardValue(dealerUp);
   const h17 = rules.dealerHitsSoft17;
   const { total, soft } = handValue(cards);

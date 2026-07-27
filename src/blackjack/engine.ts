@@ -1,5 +1,6 @@
 import { decide } from './basicStrategy';
 import { cardValue, handValue, isBust } from './cards';
+import { StrategyOverrides } from './strategyOverrides';
 import { freshShoe, rotatedShoe } from '../casino/shoe';
 import { AiPlayer, BlackjackHand, BlackjackRules, BlackjackState, BotSeat, Card, HandOutcome, PlayerAction } from './types';
 
@@ -97,7 +98,7 @@ function newHand(id: string, bet: number, cards: Card[], fromSplit = false, spli
 }
 
 // play every bot seat to completion, drawing in seat order
-function playAiHands(state: BlackjackState): BlackjackState {
+function playAiHands(state: BlackjackState, overrides?: StrategyOverrides): BlackjackState {
   if (state.aiPlayers.length === 0) return state;
   let shoe = [...state.shoe];
   let shoeNumber = state.shoeNumber;
@@ -135,7 +136,7 @@ function playAiHands(state: BlackjackState): BlackjackState {
           double: firstTwo && (!hand.fromSplit || rules.doubleAfterSplit),
           split: firstTwo && cardValue(hand.cards[0]) === cardValue(hand.cards[1]) && player.hands.length < rules.maxHands && (!hand.splitAces || rules.resplitAces),
           surrender: rules.surrenderAllowed && firstTwo && !hand.fromSplit && player.hands.length === 1,
-        });
+        }, overrides);
         if (play.action === 'stand') { hand.stood = true; break; }
         if (play.action === 'surrender') { hand.surrendered = true; hand.stood = true; break; }
         if (play.action === 'double') { hand.cards.push(drawLocal()); hand.doubled = true; hand.stood = true; break; }
@@ -156,7 +157,7 @@ function playAiHands(state: BlackjackState): BlackjackState {
   return { ...state, shoe, shoeNumber, shoeSeed, reshuffleAt, events, aiPlayers: players };
 }
 
-export function startRound(state: BlackjackState, bet: number): { state: BlackjackState; error?: string } {
+export function startRound(state: BlackjackState, bet: number, overrides?: StrategyOverrides): { state: BlackjackState; error?: string } {
   if (state.phase === 'player') return { state, error: 'Round already in progress.' };
   if (bet < state.rules.tableMinimum) return { state, error: `Table minimum is $${state.rules.tableMinimum}.` };
   if (bet > state.rules.tableMaximum) return { state, error: `Table maximum is $${state.rules.tableMaximum}.` };
@@ -218,7 +219,7 @@ export function startRound(state: BlackjackState, bet: number): { state: Blackja
   if (next.insurance) {
     next = { ...next, insurance: { ...next.insurance, result: 'lost' }, events: [...next.events, 'Insurance loses — dealer has no blackjack.'] };
   }
-  next = playAiHands(next);
+  next = playAiHands(next, overrides);
   if (isBlackjack(hand)) {
     return { state: settleRound({ ...next, holeRevealed: true, events: [...next.events, 'Blackjack!'] }) };
   }

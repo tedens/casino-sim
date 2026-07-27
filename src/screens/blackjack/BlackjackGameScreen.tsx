@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { progressionBet, resolveStrategy } from '../../blackjack/betting';
 import { CustomBettingStrategy, loadCustomStrategies } from '../../casino/customStrategies';
+import { StrategyOverrides, loadStrategyOverrides } from '../../blackjack/strategyOverrides';
 import { availableActions, cardText, cardValue, createBlackjackState, handLabel, handValue, isBust, playerAction, sessionProfit, startRound } from '../../blackjack/engine';
 import { BlackjackSettings } from '../../blackjack/storage';
 import { hintFor } from '../../blackjack/strategy';
@@ -113,11 +114,14 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
   const stepRef = useRef(0);
   const [customs, setCustoms] = useState<CustomBettingStrategy[]>([]);
   const customsRef = useRef<CustomBettingStrategy[]>([]);
+  const [overrides, setOverrides] = useState<StrategyOverrides>({});
+  const overridesRef = useRef<StrategyOverrides>({});
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
   useEffect(() => {
     loadCustomStrategies().then((loaded) => { customsRef.current = loaded; setCustoms(loaded); }).catch(() => undefined);
+    loadStrategyOverrides().then((loaded) => { overridesRef.current = loaded; setOverrides(loaded); }).catch(() => undefined);
   }, []);
 
   const applyStep = (value: number) => {
@@ -135,7 +139,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
   }, [settings.bettingStrategy]);
 
   const actions = availableActions(game);
-  const hint = useMemo(() => (settings.showHints ? hintFor(game) : null), [game, settings.showHints]);
+  const hint = useMemo(() => (settings.showHints ? hintFor(game, overrides) : null), [game, settings.showHints, overrides]);
   const betting = game.phase !== 'player';
   const activeHand = game.phase === 'player' ? game.hands[game.activeHand] : undefined;
   const dealerValue = game.dealer.length > 0 && game.holeRevealed ? handLabel(game.dealer) : game.dealer.length > 0 ? `showing ${cardValue(game.dealer[0])}` : '';
@@ -186,7 +190,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
         ? progressionBet(resolveStrategy(current.bettingStrategy, customsRef.current).unitsForStep(stepRef.current, current.progressionMaxUnits), state.rules, state.bankroll)
         : Math.min(state.lastBet || state.rules.tableMinimum, state.bankroll);
       if (bet < state.rules.tableMinimum) { stopWatching('Auto-play stopped: bankroll below table minimum.'); return; }
-      const result = startRound(state, bet);
+      const result = startRound(state, bet, overridesRef.current);
       if (result.error) { stopWatching(`Auto-play stopped: ${result.error}`); return; }
       next = result.state;
       note = [`Auto: DEAL $${bet}`, ...next.events, settleProgression(next)].filter(Boolean).join(' · ');
@@ -223,7 +227,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
 
   const deal = (amount: number) => {
     if (watchingRef.current) return;
-    const result = startRound(game, amount);
+    const result = startRound(game, amount, overridesRef.current);
     if (result.error) { setMessage(result.error); return; }
     setGame(result.state);
     setPendingBet(0);

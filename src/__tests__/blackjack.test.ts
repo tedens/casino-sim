@@ -2,6 +2,7 @@ import { nextStep, progressionBet, resolveStrategy, unitsForStep } from '../blac
 import { CustomBettingStrategy } from '../casino/customStrategies';
 import { availableActions, createBlackjackState, handValue, isBlackjack, playerAction, sessionProfit, startRound } from '../blackjack/engine';
 import { decide, hintFor, strategyChart } from '../blackjack/strategy';
+import { cellKey, handCell } from '../blackjack/chart';
 import { BlackjackState, Card, Rank } from '../blackjack/types';
 
 const card = (rank: Rank): Card => ({ rank, suit: '♠' });
@@ -340,6 +341,38 @@ describe('basic strategy hints', () => {
       expect(hint).not.toBeNull();
       expect(availableActions(hit.state)).toContain(hint!.action);
     }
+  });
+
+  test('live hands map to the right chart cell', () => {
+    expect(handCell([card('10'), card('6')], card('9'))).toEqual({ section: 'hard', label: '16', upLabel: '9' });
+    expect(handCell([card('A'), card('7')], card('3'))).toEqual({ section: 'soft', label: 'A,7', upLabel: '3' });
+    expect(handCell([card('8'), card('8')], card('K'))).toEqual({ section: 'pair', label: '8,8', upLabel: '10' });
+    expect(handCell([card('K'), card('Q')], card('5'))).toEqual({ section: 'pair', label: '10,10', upLabel: '5' });
+    expect(handCell([card('5'), card('2')], card('A'))).toEqual({ section: 'hard', label: '5–7', upLabel: 'A' });
+  });
+
+  test('a user override replaces the book play for its cell only', () => {
+    const allowed = { hit: true, double: true, split: true, surrender: true };
+    // book doubles 11 vs 10; override it to hit
+    expect(decide([card('6'), card('5')], card('10'), rules, allowed).action).toBe('double');
+    const overrides = { [cellKey('hard', '11', '10')]: 'H' as const };
+    expect(decide([card('6'), card('5')], card('10'), rules, allowed, overrides).action).toBe('hit');
+    // a different 11 (vs 6) is untouched
+    expect(decide([card('6'), card('5')], card('6'), rules, allowed, overrides).action).toBe('double');
+  });
+
+  test('override falls back to the book when the code can not apply', () => {
+    // force split on 16 (not a pair) → codeToHint returns null → book hits/stands
+    const overrides = { [cellKey('hard', '16', '9')]: 'P' as const };
+    const result = decide([card('10'), card('6')], card('9'), rules, { hit: true, double: false, split: false, surrender: false }, overrides);
+    expect(['hit', 'stand']).toContain(result.action);
+  });
+
+  test('strategyChart reflects overrides in the displayed cell', () => {
+    const overrides = { [cellKey('hard', '16', '10')]: 'S' as const };
+    const chart = strategyChart(rules, overrides);
+    const sixteen = chart.find((s) => s.section === 'hard')!.rows.find((r) => r.label === '16')!;
+    expect(sixteen.cells[8]).toBe('S'); // dealer 10 column
   });
 
   test('chart honours the surrender setting', () => {
