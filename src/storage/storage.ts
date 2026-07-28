@@ -9,11 +9,11 @@ const SETTINGS_KEY = '@craps-lab/settings/v1';
 const LAB_DEFAULTS_KEY = '@craps-lab/lab-defaults/v1';
 const SELECTED_LAB_KEY = '@lab/selected/v1';
 
-export type LabId = 'craps' | 'blackjack' | 'baccarat';
+export type LabId = 'craps' | 'blackjack' | 'baccarat' | 'roulette';
 
 export async function loadSelectedLab(): Promise<LabId> {
   const raw = await AsyncStorage.getItem(SELECTED_LAB_KEY);
-  return raw === 'blackjack' || raw === 'baccarat' ? raw : 'craps';
+  return raw === 'blackjack' || raw === 'baccarat' || raw === 'roulette' ? raw : 'craps';
 }
 
 export async function saveSelectedLab(lab: LabId): Promise<void> {

@@ -1,6 +1,6 @@
 # Casino Strategy Lab
 
-Offline Expo simulator with two labs, switchable from the top-left menu. Runs on iOS, Android, and web.
+Offline Expo simulator with four labs, switchable from the top-left menu. Runs on iOS, Android, and web.
 
 ## Craps lab
 
@@ -19,6 +19,18 @@ Offline Expo simulator with two labs, switchable from the top-left menu. Runs on
 - Auto-play that follows the book for every hand and sizes bets from the active strategy.
 - Up to five bot seats playing basic strategy from the same shoe, dealt in casino order.
 - Per-shoe seed rotation with a jittered cut card; full-session P/L graph with hover crosshair.
+
+## Baccarat lab
+
+- Punto banco with the full third-card tableau, 5% banker commission, tie and pair bets.
+- Full-shoe bead road with per-shoe reset; shares the seeded shoe, betting strategies, and P/L chart.
+
+## Roulette lab
+
+- European or American wheel with a physically simulated rotor, ball decay, deflector strike, and bounce — all seeded.
+- Live stats while building a layout: total bet, coverage %, best hit, theoretical loss per spin, and a running comp meter.
+- Save any layout as a named strategy; enabled strategies bet every spin with their own bankrolls and charts, racing head-to-head against identical wheel results.
+- The wheel spins itself every 30–60 seconds after the first spin (speed-scalable), locking bets while the ball is rolling.
 
 ## Run
 
