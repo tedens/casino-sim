@@ -26,6 +26,15 @@ const CHART_PALETTE: ChartPalette = {
 const CHIP_VALUES = [1, 5, 25, 100, 500];
 const WATCH_SPEEDS = [250, 750, 1500, 3000];
 
+// verdict on a round where the edited card diverged from the book, judged against
+// a same-shoe replay of the round played strictly by the book (risk-adjusted):
+// success = the tweak won more or lost less than the book would have
+interface DeviationTag {
+  tag: 'success' | 'fail' | 'push';
+  /** actual net minus the book-replay net; null when no clean replay was possible */
+  delta: number | null;
+}
+
 const ACTION_LABELS: Record<PlayerAction, string> = {
   hit: 'HIT',
   stand: 'STAND',
@@ -117,9 +126,11 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
   const [overrides, setOverrides] = useState<StrategyOverrides>({});
   const overridesRef = useRef<StrategyOverrides>({});
   // auto-play deviation tracking: rounds where the edited card diverged from the book, tagged by outcome
-  const [deviationTags, setDeviationTags] = useState<Record<number, 'success' | 'fail' | 'push'>>({});
-  const deviationTagsRef = useRef<Record<number, 'success' | 'fail' | 'push'>>({});
+  const [deviationTags, setDeviationTags] = useState<Record<number, DeviationTag>>({});
+  const deviationTagsRef = useRef<Record<number, DeviationTag>>({});
   const roundDeviatedRef = useRef(false);
+  // snapshot of the state fed into startRound, so a settled round can be replayed by the book
+  const preRoundRef = useRef<{ state: BlackjackState; bet: number } | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
 
@@ -177,14 +188,39 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
     setMessage(text);
   };
 
-  // on settle, tag a round where the edited card diverged from the book by its outcome
+  // replay the round from the same pre-deal shoe with pure book plays; the identical
+  // card order makes this the true "what if I had followed the book" counterfactual
+  const bookReplayNet = (): number | null => {
+    const pre = preRoundRef.current;
+    if (!pre) return null;
+    // a reshuffle rotates to fresh random entropy, so a replay would see different cards
+    if (pre.state.shoe.length <= pre.state.reshuffleAt) return null;
+    const dealt = startRound(pre.state, pre.bet);
+    if (dealt.error) return null;
+    let replay = dealt.state;
+    let guard = 0;
+    while (replay.phase === 'player' && guard < 32) {
+      const play = hintFor(replay);
+      replay = playerAction(replay, play?.action ?? 'stand').state;
+      guard += 1;
+    }
+    if (replay.phase !== 'settled') return null;
+    return replay.history[replay.history.length - 1]?.profit ?? null;
+  };
+
+  // on settle, judge a diverging round against the book counterfactual: winning less
+  // than the book would have still backfired; losing less than the book still worked
   const recordDeviationOutcome = (settled: BlackjackState) => {
     if (!roundDeviatedRef.current) return;
     roundDeviatedRef.current = false;
     const record = settled.history[settled.history.length - 1];
     if (!record) return;
-    const tag = record.profit > 0 ? 'success' : record.profit < 0 ? 'fail' : 'push';
-    const nextTags = { ...deviationTagsRef.current, [record.index]: tag as 'success' | 'fail' | 'push' };
+    const bookNet = bookReplayNet();
+    const delta = bookNet === null ? null : record.profit - bookNet;
+    const tag: DeviationTag['tag'] = delta === null
+      ? record.profit > 0 ? 'success' : record.profit < 0 ? 'fail' : 'push'
+      : delta > 0 ? 'success' : delta < 0 ? 'fail' : 'push';
+    const nextTags = { ...deviationTagsRef.current, [record.index]: { tag, delta } };
     deviationTagsRef.current = nextTags;
     setDeviationTags(nextTags);
   };
@@ -210,6 +246,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
         : Math.min(state.lastBet || state.rules.tableMinimum, state.bankroll);
       if (bet < state.rules.tableMinimum) { stopWatching('Auto-play stopped: bankroll below table minimum.'); return; }
       roundDeviatedRef.current = false;
+      preRoundRef.current = { state, bet };
       const result = startRound(state, bet, overridesRef.current);
       if (result.error) { stopWatching(`Auto-play stopped: ${result.error}`); return; }
       next = result.state;
@@ -237,6 +274,7 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
     setPendingBet(0);
     applyStep(0);
     roundDeviatedRef.current = false;
+    preRoundRef.current = null;
     deviationTagsRef.current = {};
     setDeviationTags({});
     setMessage('New shoe ready. Build a bet, then deal.');
@@ -280,9 +318,10 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
   const rulesLine = `BLACKJACK PAYS ${game.rules.blackjackPayout === 1.5 ? '3 TO 2' : '6 TO 5'} · DEALER ${game.rules.dealerHitsSoft17 ? 'HITS' : 'STANDS ON'} SOFT 17 · ${game.rules.surrenderAllowed ? 'LATE SURRENDER' : 'NO SURRENDER'}${game.rules.insureTwentyVsAce ? ' · INSURES 20 VS ACE' : ''} · ${game.rules.decks} DECKS`;
   const recentRounds = game.history.slice(-10).reverse();
   const tagValues = Object.values(deviationTags);
-  const tweakWins = tagValues.filter((tag) => tag === 'success').length;
-  const tweakLosses = tagValues.filter((tag) => tag === 'fail').length;
-  const tweakPushes = tagValues.filter((tag) => tag === 'push').length;
+  const tweakWins = tagValues.filter((item) => item.tag === 'success').length;
+  const tweakLosses = tagValues.filter((item) => item.tag === 'fail').length;
+  const tweakPushes = tagValues.filter((item) => item.tag === 'push').length;
+  const tweakDelta = tagValues.reduce((sum, item) => sum + (item.delta ?? 0), 0);
 
   return (
     <View style={styles.screen}>
@@ -421,24 +460,27 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
           <Text style={styles.panelSubtitle}>Round history</Text>
           {tagValues.length > 0 ? (
             <View style={styles.tweakSummary}>
-              <Text style={styles.tweakTitle}>CARD TWEAKS · AUTO-PLAY</Text>
+              <Text style={styles.tweakTitle}>CARD TWEAKS · AUTO-PLAY · VS BOOK</Text>
               <Text style={styles.tweakLine}>
                 <Text style={{ color: bjColors.success }}>{tweakWins} worked</Text>
                 <Text style={styles.tweakDim}>  ·  </Text>
                 <Text style={{ color: bjColors.danger }}>{tweakLosses} backfired</Text>
-                {tweakPushes > 0 ? <Text style={styles.tweakDim}>  ·  {tweakPushes} push</Text> : null}
+                {tweakPushes > 0 ? <Text style={styles.tweakDim}>  ·  {tweakPushes} even</Text> : null}
+                <Text style={styles.tweakDim}>  ·  net </Text>
+                <Text style={{ color: tweakDelta >= 0 ? bjColors.success : bjColors.danger }}>{formatMoney(tweakDelta, true)}</Text>
               </Text>
-              <Text style={styles.tweakNote}>Rounds where your edited card diverged from the book. Gold rows won, red rows lost — a running read on whether the tweak is paying off.</Text>
+              <Text style={styles.tweakNote}>Each diverging round is replayed from the same shoe with pure book plays and judged against that: gold means your edit beat the book (won more or lost less, including smaller stakes), red means the book would have done better. The net is your total edge over the book.</Text>
             </View>
           ) : null}
           {recentRounds.length === 0 ? <Text style={styles.empty}>No rounds yet.</Text> : recentRounds.map((round) => {
             const tag = deviationTags[round.index];
             return (
-              <View key={round.index} style={[styles.historyRow, tag === 'success' && styles.tweakWinRow, tag === 'fail' && styles.tweakLossRow]}>
+              <View key={round.index} style={[styles.historyRow, tag?.tag === 'success' && styles.tweakWinRow, tag?.tag === 'fail' && styles.tweakLossRow]}>
                 <Text style={styles.historyIndex}>#{round.index}{tag ? ' ✎' : ''}</Text>
                 <View style={styles.historyBody}>
                   <Text style={styles.historyCards} numberOfLines={1}>You: {round.playerSummary}</Text>
                   <Text style={styles.historyCards} numberOfLines={1}>Dealer: {round.dealerSummary}</Text>
+                  {tag && tag.delta !== null ? <Text style={[styles.tweakVsBook, { color: tag.delta > 0 ? bjColors.success : tag.delta < 0 ? bjColors.danger : bjColors.muted }]}>{formatMoney(tag.delta, true)} vs book</Text> : null}
                 </View>
                 <Text style={[styles.historyProfit, { color: round.profit > 0 ? bjColors.success : round.profit < 0 ? bjColors.danger : bjColors.muted }]}>{formatMoney(round.profit, true)}</Text>
               </View>
@@ -532,6 +574,7 @@ const styles = StyleSheet.create({
   tweakLine: { fontSize: 14, fontWeight: '900', fontVariant: ['tabular-nums'] },
   tweakDim: { color: bjColors.muted },
   tweakNote: { color: bjColors.muted, fontSize: 11, lineHeight: 15 },
+  tweakVsBook: { fontSize: 10, fontWeight: '900', fontVariant: ['tabular-nums'] },
   historyIndex: { color: bjColors.muted, width: 34, fontSize: 11 },
   historyBody: { flex: 1, gap: 1 },
   historyCards: { color: bjColors.ink, fontSize: 11 },
