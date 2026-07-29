@@ -27,7 +27,7 @@ export function Chip({ value, selected, onPress, small = false }: { value: numbe
     ]}>
       {doubled ? <View style={[styles.chipUnder, small && styles.smallChipUnder, { backgroundColor: palette.fill, borderColor: palette.rim }]} /> : null}
       <View style={[styles.chipInset, { borderColor: palette.text, backgroundColor: doubled ? palette.fill : 'transparent' }]}>
-        <Text style={[styles.chipText, small && styles.smallChipText, { color: palette.text }]}>{formatMoney(value)}</Text>
+        <Text numberOfLines={1} style={[styles.chipText, small && styles.smallChipText, small && formatMoney(value).length > 3 && styles.tinyChipText, { color: palette.text }]}>{formatMoney(value)}</Text>
       </View>
     </Pressable>
   );
@@ -161,6 +161,7 @@ const styles = StyleSheet.create({
   chipInset: { width: '72%', height: '72%', borderRadius: 999, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   chipText: { fontSize: 14, fontWeight: '900' },
   smallChipText: { fontSize: 9 },
+  tinyChipText: { fontSize: 7, letterSpacing: -0.2 },
   stackHitbox: { minWidth: 38, minHeight: 38, alignItems: 'center', justifyContent: 'flex-end', zIndex: 6 },
   stackBody: { position: 'relative' },
   stackChip: { position: 'absolute', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 2, shadowOffset: { width: 1, height: 2 } },

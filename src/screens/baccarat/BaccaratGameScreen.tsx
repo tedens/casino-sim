@@ -294,7 +294,7 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
           </RailWrap>
 
           <View style={[styles.controls, compact && styles.controlsPhone]}>
-            <View style={styles.controlMain}>
+            <View style={[styles.controlMain, compact && styles.controlMainCompact]}>
               <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={compact} selected={chip === value} onPress={() => setChip(value)} />)}</View>
               <View style={styles.rollArea}>
                 <Text style={styles.message} numberOfLines={2}>{message}</Text>
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   tableColumn: { flex: 1.75, minWidth: 560, minHeight: 0 },
   tableColumnNarrow: { flex: undefined, minWidth: 0 },
   tableRailPhone: { minHeight: 320, margin: 4, padding: 6, borderRadius: 22 },
-  tableRailLow: { minHeight: 235, margin: 3, padding: 4, borderRadius: 16 },
+  tableRailLow: { minHeight: 190, margin: 3, padding: 4, borderRadius: 16 },
   feltLow: { minHeight: 225, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12 },
   sidePanelLow: { minWidth: 260 },
   feltPhone: { minHeight: 304, paddingHorizontal: 8, paddingVertical: 8, borderRadius: 16 },
@@ -395,6 +395,7 @@ const styles = StyleSheet.create({
   cardSuit: { fontSize: 20, alignSelf: 'flex-end' },
   controls: { minHeight: 150, paddingHorizontal: 10, paddingVertical: 8, gap: 4, borderTopWidth: 1, borderTopColor: '#33161d', backgroundColor: bacColors.panel },
   controlMain: { flex: 1, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  controlMainCompact: { flex: undefined },
   chipTray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   chipTrayPhone: { width: '100%', justifyContent: 'center', gap: 4 },
   rollArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },

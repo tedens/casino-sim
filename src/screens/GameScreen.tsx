@@ -546,7 +546,7 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
           </RailWrap>
 
           <View style={[styles.controls, compact && styles.controlsPhone]}>
-            <View style={styles.controlMain}>
+            <View style={[styles.controlMain, compact && styles.controlMainCompact]}>
             <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={compact} selected={chip === value} onPress={() => selectChip(value)} />)}</View>
             {!compact ? (diceLocation === 'tray' ? <DiceResult faces={dice as [1 | 2 | 3 | 4 | 5 | 6, 1 | 2 | 3 | 4 | 5 | 6]} /> : <View style={styles.diceResultPlaceholder} />) : null}
             <View style={styles.rollArea}>
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
   tableColumn: { flex: 1.75, minWidth: 600, minHeight: 0 },
   tableColumnNarrow: { flex: undefined, minWidth: 0 },
   tableRailPhone: { minHeight: 330, margin: 4, padding: 6, borderRadius: 22 },
-  tableRailLow: { minHeight: 240, margin: 3, padding: 4, borderRadius: 16 },
+  tableRailLow: { minHeight: 190, margin: 3, padding: 4, borderRadius: 16 },
   feltLow: { minHeight: 230, paddingTop: 30, paddingHorizontal: 6, paddingBottom: 5, borderRadius: 12 },
   sidePanelLow: { minWidth: 260 },
   feltPhone: { minHeight: 314, paddingTop: 32, paddingHorizontal: 7, borderRadius: 16 },
@@ -740,6 +740,7 @@ const styles = StyleSheet.create({
   lineArmText: { width: 100, color: 'rgba(231,216,172,0.55)', fontSize: 6, fontWeight: '900', letterSpacing: 1.3, textAlign: 'center', transform: [{ rotate: '-90deg' }] },
   controls: { minHeight: 154, paddingHorizontal: 10, paddingVertical: 5, gap: 4, borderTopWidth: 1, borderTopColor: '#292f2b', backgroundColor: colors.panel },
   controlMain: { flex: 1, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  controlMainCompact: { flex: undefined },
   chipTray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   chipTrayPhone: { width: '100%', justifyContent: 'center', gap: 4 },
   diceResultPlaceholder: { width: 106, height: 58 },

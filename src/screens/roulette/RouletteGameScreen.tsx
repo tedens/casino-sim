@@ -376,7 +376,7 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
       </View>
 
       <View style={[styles.controls, compact && styles.controlsPhone]}>
-        <View style={styles.controlMain}>
+        <View style={[styles.controlMain, compact && styles.controlMainCompact]}>
           <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={compact} selected={chip === value} onPress={() => setChip(value)} />)}</View>
           <View style={styles.rollArea}>
             <Text style={styles.message} numberOfLines={2}>{message}</Text>
@@ -459,6 +459,7 @@ const styles = StyleSheet.create({
   controlsPhone: { minHeight: 0, paddingVertical: 4 },
   spinButtonPhone: { minWidth: 96, minHeight: 46 },
   controlMain: { flex: 1, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  controlMainCompact: { flex: undefined },
   chipTray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   chipTrayPhone: { width: '100%', justifyContent: 'center', gap: 4 },
   rollArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
