@@ -3,7 +3,7 @@
     "name": "Craps Strategy Lab",
     "slug": "craps-strategy-lab",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
@@ -16,7 +16,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.crapsstrategylab"
     },
     "web": {
       "favicon": "./assets/favicon.png",

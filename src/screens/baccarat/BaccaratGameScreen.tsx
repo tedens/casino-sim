@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { BET_KINDS, baccaratTotal, betLabel, createBaccaratState, playRound, sessionProfit } from '../../baccarat/engine';
 import { BaccaratSettings } from '../../baccarat/storage';
 import { bacColors } from '../../baccarat/theme';
@@ -12,7 +12,7 @@ import { Button, Chip, ChipStack, Money, formatMoney } from '../../ui/components
 import { ChartPalette, ProfitChart } from '../../ui/ProfitChart';
 import { DealtCard, groupDelay } from '../../ui/DealtCard';
 
-const CHIP_VALUES = [1, 5, 25, 100, 500];
+const CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500];
 const WATCH_SPEEDS = [250, 750, 1500, 3000];
 const MAIN_SIDES: BaccaratBetKind[] = ['player', 'banker', 'tie'];
 
@@ -221,6 +221,10 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
   const recentRounds = game.history.slice(-10).reverse();
   const showHands = game.playerCards.length > 0 && pendingTotal === 0;
 
+  const { width: windowWidth } = useWindowDimensions();
+  const narrow = windowWidth < 900;
+  const TableWrap = (narrow ? ScrollView : View) as typeof View;
+
   return (
     <View style={styles.screen}>
       <View style={styles.topbar}>
@@ -233,8 +237,8 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
         <Button label="New session" variant="secondary" onPress={reset} style={styles.wineSecondary} />
       </View>
 
-      <View style={styles.body}>
-        <View style={styles.tableColumn}>
+      <View style={[styles.body, narrow && styles.bodyNarrow]}>
+        {!narrow || !showPanel ? <TableWrap style={[styles.tableColumn, narrow && styles.tableColumnNarrow]}>
           <View style={styles.tableRail}>
             <View style={styles.felt}>
               <Text style={styles.rulesArc}>{rulesLine}</Text>
@@ -311,9 +315,9 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
               />
             </View>
           </View>
-        </View>
+        </TableWrap> : null}
 
-        {showPanel ? <ScrollView style={styles.sidePanel} contentContainerStyle={styles.sideContent}>
+        {showPanel ? <ScrollView style={[styles.sidePanel, narrow && styles.sidePanelNarrow]} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={game.profitSeries} title="SESSION P/L" pointLabel="Coup" palette={CHART_PALETTE} />
           <BeadRoad road={game.beadRoad} shoeNumber={game.shoeNumber} />
           <Text style={styles.panelSubtitle}>Coup history</Text>
@@ -338,13 +342,15 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, minHeight: 0, backgroundColor: bacColors.background },
-  topbar: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 22, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#33161d', backgroundColor: '#160a0d' },
+  topbar: { minHeight: 72, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#33161d', backgroundColor: '#160a0d' },
   eyebrow: { color: bacColors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginBottom: 2 },
   bigMoney: { fontSize: 22 },
   shoeCount: { color: bacColors.gold, fontSize: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
   topbarSpace: { flex: 1 },
   body: { flex: 1, minHeight: 0, flexDirection: 'row' },
+  bodyNarrow: { flexDirection: 'column' },
   tableColumn: { flex: 1.75, minWidth: 560, minHeight: 0 },
+  tableColumnNarrow: { flex: 1, minWidth: 0 },
   tableRail: { flex: 1, minHeight: 400, margin: 7, padding: 9, borderRadius: 40, backgroundColor: '#241016', borderWidth: 2, borderColor: '#54262f', shadowColor: '#000', shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   felt: { flex: 1, minHeight: 380, backgroundColor: bacColors.felt, borderWidth: 2, borderColor: '#8a4152', borderRadius: 30, paddingHorizontal: 18, paddingVertical: 14, overflow: 'hidden' },
   rulesArc: { color: 'rgba(230,200,205,0.6)', fontWeight: '900', fontSize: 9, letterSpacing: 2, textAlign: 'center', marginBottom: 10 },
@@ -357,7 +363,7 @@ const styles = StyleSheet.create({
   versus: { color: 'rgba(230,200,205,0.5)', fontWeight: '900', fontSize: 11, letterSpacing: 2 },
   winBadge: { fontWeight: '900', fontSize: 11, letterSpacing: 1.2, borderWidth: 1, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3 },
   tieBadge: { alignSelf: 'center', fontWeight: '900', fontSize: 11, letterSpacing: 1.2, borderWidth: 1, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 3, marginBottom: 6 },
-  zoneRow: { flexDirection: 'row', gap: 8, minHeight: 110 },
+  zoneRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, minHeight: 110 },
   zone: { flex: 1, borderWidth: 1.5, borderRadius: 12, alignItems: 'center', paddingTop: 8, backgroundColor: 'rgba(10,3,5,0.25)' },
   mainZone: { flex: 1.6 },
   pressedZone: { opacity: 0.7 },
@@ -369,12 +375,12 @@ const styles = StyleSheet.create({
   cardRank: { fontSize: 18, fontWeight: '900' },
   cardSuit: { fontSize: 20, alignSelf: 'flex-end' },
   controls: { minHeight: 150, paddingHorizontal: 10, paddingVertical: 8, gap: 4, borderTopWidth: 1, borderTopColor: '#33161d', backgroundColor: bacColors.panel },
-  controlMain: { flex: 1, width: '100%', flexDirection: 'row', alignItems: 'center', gap: 10 },
-  chipTray: { flexDirection: 'row', alignItems: 'center' },
+  controlMain: { flex: 1, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  chipTray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   rollArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   message: { flex: 1, color: bacColors.muted, fontSize: 11 },
   dealButton: { minWidth: 132, minHeight: 58 },
-  automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#3d1822', paddingTop: 4 },
+  automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#3d1822', paddingTop: 4 },
   watchLabel: { color: bacColors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1, marginLeft: 5 },
   sideButton: { minHeight: 29, minWidth: 62, paddingHorizontal: 6 },
   speedButton: { minHeight: 29, minWidth: 43, paddingHorizontal: 6 },
@@ -382,6 +388,7 @@ const styles = StyleSheet.create({
   wineSecondary: { borderColor: bacColors.borderLight, backgroundColor: bacColors.panelLight },
   wineGhost: { borderColor: bacColors.border },
   sidePanel: { flex: 1, minWidth: 320, minHeight: 0, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: '#33161d', backgroundColor: bacColors.panel },
+  sidePanelNarrow: { minWidth: 0, maxWidth: undefined, borderLeftWidth: 0 },
   sideContent: { padding: 14, gap: 9 },
   panelSubtitle: { color: bacColors.ink, fontWeight: '900', fontSize: 14, marginTop: 7 },
   empty: { color: bacColors.muted, fontStyle: 'italic' },

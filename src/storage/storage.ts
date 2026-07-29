@@ -27,6 +27,7 @@ export interface AppSettings {
   animationSpeed: 'slow' | 'normal' | 'fast';
   showWinnings: boolean;
   selectedChip: number;
+  keepBetsUp: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -36,6 +37,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   animationSpeed: 'normal',
   showWinnings: true,
   selectedChip: 5,
+  keepBetsUp: true,
 };
 
 export interface LabDefaults {

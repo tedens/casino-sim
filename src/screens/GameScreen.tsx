@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { BELLAGIO_RULESET } from '../domain/ruleset';
 import { createGameState, invalidWagerForRoll, moveWagerTarget, placeWager, removeWager, resizeWager, sessionProfit, setWagerWorking, settleRoll, wagerLabel } from '../domain/engine';
 import { createManualSeed, SeededRng } from '../domain/rng';
@@ -21,7 +21,7 @@ const DiceThrow = React.lazy(async () => {
   return { default: module.DiceThrow };
 });
 
-const CHIP_VALUES = [1, 5, 25, 100, 500];
+const CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500];
 const POINTS: PointNumber[] = [4, 5, 6, 8, 9, 10];
 const HOPS: WagerTarget[] = Array.from({ length: 6 }, (_, a) => Array.from({ length: 6 - a }, (_, offset) => `${a + 1}-${a + 1 + offset}` as WagerTarget)).flat();
 const WATCH_SPEEDS = [250, 750, 1500, 3000];
@@ -64,20 +64,22 @@ interface ZoneProps {
 }
 
 function BetZone({ label, sublabel, amount = 0, stacks, onPress, active, compact, tone }: ZoneProps) {
+  const tight = useWindowDimensions().width < 900;
   const visibleStacks = stacks ?? [{ key: 'base', amount }];
   const numberZone = ['4', '5', '6', '8', '9', '10'].includes(label);
   return (
-    <View style={[styles.zoneWrap, compact && styles.compactZoneWrap]}>
+    <View style={[styles.zoneWrap, compact && styles.compactZoneWrap, tight && styles.tightZoneWrap]}>
       <Pressable onPress={onPress} style={({ pressed }) => [styles.zone, compact && styles.compactZone, tone === 'red' && styles.redZone, tone === 'gold' && styles.goldZone, active && styles.activeZone, pressed && styles.pressedZone]}>
         <Text style={[styles.zoneLabel, numberZone && styles.numberZoneLabel, active && styles.activeZoneText]}>{label}</Text>
         {sublabel ? <Text style={[styles.zoneOdds, active && styles.activeZoneText]}>{sublabel}</Text> : null}
-        <View style={styles.zoneStacks}>{visibleStacks.filter((stack) => stack.amount > 0).map((stack) => <ChipStack key={stack.key} amount={stack.amount} label={stack.label} size={compact ? 'compact' : 'table'} />)}</View>
+        <View style={styles.zoneStacks}>{visibleStacks.filter((stack) => stack.amount > 0).map((stack) => <ChipStack key={stack.key} amount={stack.amount} label={stack.label} size={compact || tight ? 'compact' : 'table'} />)}</View>
       </Pressable>
     </View>
   );
 }
 
 function FieldZone({ amount, onPress }: { amount: number; onPress: () => void }) {
+  const tight = useWindowDimensions().width < 900;
   return (
     <View style={styles.zoneWrap}>
       <Pressable onPress={onPress} style={({ pressed }) => [styles.fieldZone, pressed && styles.pressedZone]}>
@@ -87,7 +89,7 @@ function FieldZone({ amount, onPress }: { amount: number; onPress: () => void })
           <Text style={styles.fieldRun}>3     4      9     10     11</Text>
           <View style={styles.fieldDouble}><Text style={styles.fieldBigNumber}>12</Text><Text style={styles.fieldPay}>PAYS 3×</Text></View>
         </View>
-        <View style={styles.fieldChip}>{amount > 0 ? <ChipStack amount={amount} size="table" /> : null}</View>
+        <View style={styles.fieldChip}>{amount > 0 ? <ChipStack amount={amount} size={tight ? 'compact' : 'table'} /> : null}</View>
       </Pressable>
     </View>
   );
@@ -122,6 +124,7 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
   const makeState = () => createGameState({
     seed: createManualSeed(),
     startingBankroll: settings.startingBankroll,
+    repeatBets: settings.keepBetsUp,
     ruleset: { ...BELLAGIO_RULESET, tableMinimum: settings.tableMinimum, tableMaximum: settings.tableMaximum, startingBankroll: settings.startingBankroll },
   });
   const [game, setGame] = useState<GameState>(makeState);
@@ -446,6 +449,10 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
     onChangeSettings({ ...settings, selectedChip: value });
   };
 
+  const { width: windowWidth } = useWindowDimensions();
+  const narrow = windowWidth < 900;
+  const TableWrap = (narrow ? ScrollView : View) as typeof View;
+
   return (
     <View style={styles.screen}>
       {winFlash !== null ? <View pointerEvents="none" style={styles.winFlash}><Text style={styles.winFlashText}>{formatMoney(winFlash, true)}</Text><Text style={styles.winFlashLabel}>WIN</Text></View> : null}
@@ -465,8 +472,8 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
         <Button label="New session" variant="secondary" onPress={reset} />
       </View>
 
-      <View style={styles.body}>
-        <View style={styles.tableColumn}>
+      <View style={[styles.body, narrow && styles.bodyNarrow]}>
+        <TableWrap style={[styles.tableColumn, narrow && styles.tableColumnNarrow]}>
           <View style={styles.tableRail}>
           <View style={styles.felt} onLayout={handleFeltLayout}>
             <View style={styles.feltWearOne} /><View style={styles.feltWearTwo} />
@@ -542,9 +549,9 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
               <Button label={watching ? 'STOP WATCH' : 'WATCH STRATEGY'} variant={watching ? 'danger' : 'secondary'} onPress={() => watching ? stopWatching() : startWatching()} disabled={rolling && !watching} style={styles.watchButton} />
             </View>
           </View>
-        </View>
+        </TableWrap>
 
-        <ScrollView style={styles.sidePanel} contentContainerStyle={styles.sideContent}>
+        <ScrollView style={[styles.sidePanel, narrow && styles.sidePanelNarrow]} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={profitSeries} title="REALIZED P/L" pointLabel="Roll" palette={CHART_PALETTE} />
 
           <Text style={styles.panelSubtitle}>Roll history</Text>
@@ -654,7 +661,7 @@ const styles = StyleSheet.create({
   winFlash: { position: 'absolute', top: 105, left: '30%', minWidth: 180, alignItems: 'center', zIndex: 100, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 18, backgroundColor: 'rgba(7,13,10,0.78)', borderWidth: 1, borderColor: '#e1bd58', shadowColor: '#f0c65a', shadowOpacity: 0.85, shadowRadius: 18 },
   winFlashText: { color: '#f4cc62', fontSize: 48, lineHeight: 52, fontWeight: '900', fontVariant: ['tabular-nums'], textShadowColor: '#7c5512', textShadowRadius: 8 },
   winFlashLabel: { color: '#d6b55e', fontSize: 8, fontWeight: '900', letterSpacing: 3 },
-  topbar: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 22, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#2f352f', backgroundColor: '#080d0b' },
+  topbar: { minHeight: 72, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#2f352f', backgroundColor: '#080d0b' },
   eyebrow: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginBottom: 2 },
   bigMoney: { fontSize: 22 },
   shooterNumber: { color: colors.gold, fontSize: 18, fontWeight: '900', fontVariant: ['tabular-nums'] },
@@ -664,7 +671,9 @@ const styles = StyleSheet.create({
   strategyPicker: { flex: 1, minWidth: 190 },
   strategyButton: { marginRight: 6, minHeight: 32 },
   body: { flex: 1, minHeight: 0, flexDirection: 'row' },
+  bodyNarrow: { flexDirection: 'column' },
   tableColumn: { flex: 1.75, minWidth: 600, minHeight: 0 },
+  tableColumnNarrow: { flex: 2.1, minWidth: 0 },
   tableRail: { flex: 1, minHeight: 430, margin: 7, padding: 9, borderRadius: 40, backgroundColor: '#24170f', borderWidth: 2, borderColor: '#5a3e29', shadowColor: '#000', shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   felt: { flex: 1, minHeight: 410, backgroundColor: colors.felt, borderWidth: 2, borderColor: '#8f7543', borderRadius: 30, paddingHorizontal: 14, paddingBottom: 9, paddingTop: 38, overflow: 'hidden' },
   feltWearOne: { position: 'absolute', width: 310, height: 310, borderRadius: 155, left: '15%', top: '18%', backgroundColor: 'rgba(255,255,255,0.012)' },
@@ -683,6 +692,7 @@ const styles = StyleSheet.create({
   lineRows: { flex: 0.62, flexDirection: 'row', gap: 3, marginTop: 3, borderBottomLeftRadius: 22, borderBottomRightRadius: 22, overflow: 'hidden' },
   zoneWrap: { flex: 1, alignItems: 'stretch', minWidth: 66 },
   compactZoneWrap: { minWidth: 80 },
+  tightZoneWrap: { minWidth: 46 },
   zone: { flex: 1, minHeight: 38, borderRadius: 2, borderWidth: 1, borderColor: colors.line, backgroundColor: 'rgba(2,14,11,0.18)', alignItems: 'center', justifyContent: 'flex-start', paddingHorizontal: 4, paddingTop: 4 },
   compactZone: { minHeight: 38, paddingHorizontal: 5 },
   activeZone: { backgroundColor: colors.gold },
@@ -707,19 +717,20 @@ const styles = StyleSheet.create({
   rightLineArm: { position: 'absolute', right: 2, top: 176, bottom: 35, width: 12, borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#c9b277', alignItems: 'center', justifyContent: 'center' },
   lineArmText: { width: 100, color: 'rgba(231,216,172,0.55)', fontSize: 6, fontWeight: '900', letterSpacing: 1.3, textAlign: 'center', transform: [{ rotate: '-90deg' }] },
   controls: { minHeight: 154, paddingHorizontal: 10, paddingVertical: 5, gap: 4, borderTopWidth: 1, borderTopColor: '#292f2b', backgroundColor: colors.panel },
-  controlMain: { flex: 1, width: '100%', flexDirection: 'row', alignItems: 'center', gap: 10 },
-  chipTray: { flexDirection: 'row', alignItems: 'center' },
+  controlMain: { flex: 1, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  chipTray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   diceResultPlaceholder: { width: 106, height: 58 },
   rollArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   message: { flex: 1, color: colors.muted, fontSize: 11 },
   blockReason: { color: '#e8b551', fontWeight: '800' },
   rollButton: { minWidth: 122, minHeight: 58 },
-  automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#303832', paddingTop: 4 },
+  automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#303832', paddingTop: 4 },
   toolButton: { minHeight: 29, paddingHorizontal: 9 },
   watchLabel: { color: colors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1, marginLeft: 5 },
   speedButton: { minHeight: 29, minWidth: 43, paddingHorizontal: 6 },
   watchButton: { minHeight: 31, minWidth: 128, marginLeft: 'auto' },
   sidePanel: { flex: 1, minWidth: 340, minHeight: 0, maxWidth: 520, borderLeftWidth: 1, borderLeftColor: '#343b36', backgroundColor: colors.panel },
+  sidePanelNarrow: { minWidth: 0, maxWidth: undefined, borderLeftWidth: 0, borderTopWidth: 1, borderTopColor: '#343b36' },
   sideContent: { padding: 14, gap: 9 },
   panelTitle: { color: colors.ink, fontWeight: '900', fontSize: 20 },
   panelSubtitle: { color: colors.ink, fontWeight: '900', fontSize: 14, marginTop: 7 },

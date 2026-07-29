@@ -181,3 +181,57 @@ describe('dice generator', () => {
     counts.forEach((count) => expect(Math.abs(count - 20000)).toBeLessThan(700));
   });
 });
+
+describe('repeat mode keeps winning bets up', () => {
+  const repeatState = () => createGameState({ repeatBets: true });
+
+  test('field win collects profit and stays on the felt', () => {
+    let state = bet(repeatState(), { kind: 'field', amount: 5 });
+    state = settleRoll(state, 2, 2).state;
+    expect(state.wagers).toHaveLength(1);
+    expect(state.wagers[0]).toMatchObject({ kind: 'field', amount: 5 });
+    expect(state.bankroll).toBe(5000); // -5 stake +5 profit, stake re-locked
+    expect(sessionProfit(state)).toBe(5);
+    // triple field 12 pays 3x and still rides
+    state = settleRoll(state, 6, 6).state;
+    expect(state.wagers).toHaveLength(1);
+    expect(sessionProfit(state)).toBe(20);
+  });
+
+  test('come bet stays on its number after the point repeats', () => {
+    let state = bet(repeatState(), { kind: 'pass', amount: 5 });
+    state = settleRoll(state, 3, 3).state; // point 6
+    state = bet(state, { kind: 'come', amount: 5 });
+    state = settleRoll(state, 4, 4).state; // come travels to 8
+    expect(state.wagers.find((wager) => wager.kind === 'come')).toMatchObject({ contract: true, comePoint: 8 });
+    const before = sessionProfit(state);
+    state = settleRoll(state, 5, 3).state; // 8 repeats: pay even money, bet rides
+    const come = state.wagers.find((wager) => wager.kind === 'come');
+    expect(come).toMatchObject({ contract: true, comePoint: 8, amount: 5 });
+    expect(sessionProfit(state)).toBe(before + 5);
+  });
+
+  test('losses still take repeated bets down', () => {
+    let state = bet(repeatState(), { kind: 'field', amount: 5 });
+    state = settleRoll(state, 3, 4).state; // 7 loses the field
+    expect(state.wagers.filter((wager) => wager.kind === 'field')).toHaveLength(0);
+  });
+
+  test('repeat mode unlocks come contracts for take-down', () => {
+    let state = bet(repeatState(), { kind: 'pass', amount: 5 });
+    state = settleRoll(state, 3, 3).state;
+    state = bet(state, { kind: 'come', amount: 5 });
+    state = settleRoll(state, 4, 4).state;
+    const come = state.wagers.find((wager) => wager.kind === 'come')!;
+    const removed = removeWager(state, come.id);
+    expect(removed.error).toBeUndefined();
+    expect(removed.state.wagers.find((wager) => wager.kind === 'come')).toBeUndefined();
+  });
+
+  test('default mode still settles the classic way', () => {
+    let state = bet(createGameState(), { kind: 'field', amount: 5 });
+    state = settleRoll(state, 2, 2).state;
+    expect(state.wagers).toHaveLength(0);
+    expect(state.bankroll).toBe(5005);
+  });
+});

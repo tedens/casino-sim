@@ -16,7 +16,7 @@ function cloneState(state: GameState): GameState {
   return { ...state, wagers: state.wagers.map((wager) => ({ ...wager })), history: [...state.history] };
 }
 
-export function createGameState(options: Partial<Pick<GameState, 'seed' | 'startingBankroll'>> & {
+export function createGameState(options: Partial<Pick<GameState, 'seed' | 'startingBankroll' | 'repeatBets'>> & {
   ruleset?: GameState['ruleset'];
 } = {}): GameState {
   const ruleset = options.ruleset ?? BELLAGIO_RULESET;
@@ -36,6 +36,7 @@ export function createGameState(options: Partial<Pick<GameState, 'seed' | 'start
     totalWagered: 0,
     shooterRolls: 0,
     shooterCount: 1,
+    repeatBets: options.repeatBets ?? false,
   };
 }
 
@@ -328,6 +329,13 @@ function decideWager(wager: Wager, state: GameState, die1: DieFace, die2: DieFac
   }
 }
 
+// Bets that normally come down on a win but can ride when the table is in repeat mode.
+// Odds are excluded: a repeated pass-odds bet would outlive its point.
+const REPEATING_KINDS = new Set<WagerKind>([
+  'come', 'dontCome', 'field', 'horn', 'ce', 'any7', 'anyCraps',
+  'number2', 'number3', 'number11', 'number12', 'hop',
+]);
+
 export function settleRoll(state: GameState, die1: DieFace, die2: DieFace, seed = state.seed): RollResult {
   if (state.locked) throw new Error('Cannot settle while game is locked.');
   if (state.stopped) throw new Error('Cannot roll a stopped session.');
@@ -342,13 +350,19 @@ export function settleRoll(state: GameState, die1: DieFace, die2: DieFace, seed 
     const wager = { ...original };
     const decision = decideWager(wager, state, die1, die2);
     if (decision.patch) Object.assign(wager, decision.patch);
+    const repeats = state.repeatBets && !decision.keep
+      && decision.settlement?.status === 'won' && REPEATING_KINDS.has(wager.kind);
     if (decision.settlement) {
-      settlements.push(decision.settlement);
-      next.bankroll += decision.settlement.profit + decision.settlement.returned;
-      if (decision.settlement.status === 'won') events.push({ type: 'betWon', wagerId: wager.id, message: decision.settlement.message });
-      if (decision.settlement.status === 'lost') events.push({ type: 'betLost', wagerId: wager.id, message: decision.settlement.message });
+      const entry = repeats
+        ? { ...decision.settlement, returned: decision.settlement.returned - wager.amount, message: `${decision.settlement.message} Bet stays up.` }
+        : decision.settlement;
+      settlements.push(entry);
+      next.bankroll += entry.profit + entry.returned;
+      if (repeats) next.totalWagered += wager.amount;
+      if (entry.status === 'won') events.push({ type: 'betWon', wagerId: wager.id, message: entry.message });
+      if (entry.status === 'lost') events.push({ type: 'betLost', wagerId: wager.id, message: entry.message });
     }
-    if (decision.keep) kept.push(wager);
+    if (decision.keep || repeats) kept.push(wager);
   }
 
   const pointBefore = state.point;

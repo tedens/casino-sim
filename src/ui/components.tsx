@@ -15,14 +15,18 @@ export function Money({ value, signed = false, style }: { value: number; signed?
 
 export function Chip({ value, selected, onPress, small = false }: { value: number; selected?: boolean; onPress?: () => void; small?: boolean }) {
   const palette = chipColors[value] ?? chipColors[1];
+  // $10 and $50 are shorthand for a pair of $5s / $25s, drawn as a two-chip stack
+  const doubled = value === 10 || value === 50;
   return (
     <Pressable onPress={onPress} style={[
       styles.chip,
       small && styles.smallChip,
+      doubled && styles.doubledChip,
       { backgroundColor: palette.fill, borderColor: selected ? colors.gold : palette.rim },
       selected && styles.selectedChip,
     ]}>
-      <View style={[styles.chipInset, { borderColor: palette.text }]}>
+      {doubled ? <View style={[styles.chipUnder, small && styles.smallChipUnder, { backgroundColor: palette.fill, borderColor: palette.rim }]} /> : null}
+      <View style={[styles.chipInset, { borderColor: palette.text, backgroundColor: doubled ? palette.fill : 'transparent' }]}>
         <Text style={[styles.chipText, small && styles.smallChipText, { color: palette.text }]}>{formatMoney(value)}</Text>
       </View>
     </Pressable>
@@ -150,6 +154,9 @@ const styles = StyleSheet.create({
   money: { color: colors.ink, fontWeight: '800', fontVariant: ['tabular-nums'] },
   chip: { width: 66, height: 66, borderRadius: 33, borderWidth: 5, alignItems: 'center', justifyContent: 'center', marginHorizontal: 3 },
   smallChip: { width: 37, height: 37, borderRadius: 19, borderWidth: 3, marginHorizontal: 0 },
+  doubledChip: { marginTop: -5 },
+  chipUnder: { position: 'absolute', top: 4, left: -5, width: 66, height: 66, borderRadius: 33, borderWidth: 5, opacity: 0.85 },
+  smallChipUnder: { width: 37, height: 37, borderRadius: 19, borderWidth: 3, top: 3, left: -3 },
   selectedChip: { transform: [{ translateY: -5 }], shadowColor: colors.gold, shadowOpacity: 0.8, shadowRadius: 7 },
   chipInset: { width: '72%', height: '72%', borderRadius: 999, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   chipText: { fontSize: 14, fontWeight: '900' },

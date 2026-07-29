@@ -17,7 +17,9 @@ export const colors = {
 export const chipColors: Record<number, { fill: string; text: string; rim: string }> = {
   1: { fill: '#f4f0df', text: '#17221e', rim: '#bcb8aa' },
   5: { fill: '#bd2f38', text: '#ffffff', rim: '#711b24' },
+  10: { fill: '#bd2f38', text: '#ffffff', rim: '#711b24' },
   25: { fill: '#16864d', text: '#ffffff', rim: '#0d5131' },
+  50: { fill: '#16864d', text: '#ffffff', rim: '#0d5131' },
   100: { fill: '#1d2220', text: '#ffffff', rim: '#000000' },
   500: { fill: '#702f91', text: '#ffffff', rim: '#401956' },
 };

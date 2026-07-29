@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BETTING_STRATEGIES } from '../../blackjack/betting';
-import { CustomBettingStrategy, loadCustomStrategies } from '../../casino/customStrategies';
+import { CustomBettingStrategy, STEP_ACTIONS, loadCustomStrategies } from '../../casino/customStrategies';
 import { totalStake } from '../../roulette/engine';
 import { RouletteSettings, loadRouletteStrategies, saveRouletteStrategies } from '../../roulette/storage';
 import { rouColors } from '../../roulette/theme';
-import { SavedRouletteStrategy, WheelKind } from '../../roulette/types';
+import { MAX_STRATEGY_STEPS, SavedRouletteStrategy, WheelKind } from '../../roulette/types';
 import { Button, Field, SectionTitle } from '../../ui/components';
 
 const WHEELS: Array<{ id: WheelKind; label: string }> = [
@@ -74,24 +74,57 @@ export function RouletteSettingsScreen({ settings, onSave }: { settings: Roulett
       </View>
       <View style={styles.card}>
         <SectionTitle>Saved strategies</SectionTitle>
-        <Text style={styles.note}>Build a layout on the felt and save it from the table. Enabled strategies bet their layout on every spin with their own bankroll — running several at once races them against identical wheel results. A progression scales the whole layout by its ladder after each spin.</Text>
-        {strategies.length === 0 ? <Text style={styles.note}>Nothing saved yet.</Text> : strategies.map((strategy) => (
+        <Text style={styles.note}>Build a layout on the felt and save it from the table. Enabled strategies bet their layout on every spin with their own bankroll — running several at once races them against identical wheel results. A single-layout strategy can use a progression to scale its stake; a multi-step strategy (up to {MAX_STRATEGY_STEPS} layouts, added from the table) walks its own step ladder on wins and losses instead.</Text>
+        {strategies.length === 0 ? <Text style={styles.note}>Nothing saved yet.</Text> : strategies.map((strategy) => {
+          const multiStep = strategy.steps.length > 1;
+          const updateStrategy = (patch: Partial<SavedRouletteStrategy>) =>
+            changeStrategies(strategies.map((item) => item.id === strategy.id ? { ...item, ...patch } : item));
+          const removeStep = (index: number) => {
+            const steps = strategy.steps.filter((_, i) => i !== index);
+            if (steps.length === 0) return;
+            updateStrategy({ steps, bets: steps[0] });
+          };
+          return (
           <View key={strategy.id} style={styles.strategyBlock}>
             <View style={styles.strategyHeader}>
-              <Text style={styles.strategyName}>{strategy.name} · ${totalStake(strategy.bets)}/spin · {Object.keys(strategy.bets).length} spots</Text>
+              <Text style={styles.strategyName}>{strategy.name} · {multiStep ? `${strategy.steps.length}/${MAX_STRATEGY_STEPS} steps` : `$${totalStake(strategy.bets)}/spin · ${Object.keys(strategy.bets).length} spots`}</Text>
               <View style={styles.strategyButtons}>
-                <Button label={strategy.enabled ? '✓ RUNNING' : 'OFF'} variant={strategy.enabled ? 'primary' : 'ghost'} onPress={() => changeStrategies(strategies.map((item) => item.id === strategy.id ? { ...item, enabled: !item.enabled } : item))} style={[styles.smallButton, !strategy.enabled && styles.violetGhost]} />
+                <Button label={strategy.enabled ? '✓ RUNNING' : 'OFF'} variant={strategy.enabled ? 'primary' : 'ghost'} onPress={() => updateStrategy({ enabled: !strategy.enabled })} style={[styles.smallButton, !strategy.enabled && styles.violetGhost]} />
                 <Button label="DELETE" variant="danger" onPress={() => changeStrategies(strategies.filter((item) => item.id !== strategy.id))} style={styles.smallButton} />
               </View>
             </View>
-            <Text style={styles.label}>PROGRESSION</Text>
-            <View style={styles.choicesWrap}>
-              {progressionOptions.map((option) => (
-                <Button key={option.id} label={option.name.toUpperCase()} variant={strategy.progression === option.id ? 'primary' : 'ghost'} onPress={() => changeStrategies(strategies.map((item) => item.id === strategy.id ? { ...item, progression: option.id } : item))} style={[styles.smallButton, strategy.progression !== option.id && styles.violetGhost]} />
-              ))}
-            </View>
+            {multiStep ? (
+              <>
+                <Text style={styles.label}>STEP LADDER · build steps on the felt (SAVE, then “add as next step”)</Text>
+                <View style={styles.choicesWrap}>
+                  {strategy.steps.map((step, index) => (
+                    <Button key={index} label={`S${index + 1} · $${totalStake(step)}${strategy.steps.length > 1 ? '  ✕' : ''}`} variant="ghost" onPress={() => removeStep(index)} style={[styles.smallButton, styles.violetGhost]} />
+                  ))}
+                </View>
+                <View style={styles.actionRow}>
+                  <Text style={styles.label}>ON WIN</Text>
+                  {STEP_ACTIONS.map((action) => <Button key={action.id} label={action.label} variant={strategy.onWin === action.id ? 'primary' : 'ghost'} onPress={() => updateStrategy({ onWin: action.id })} style={[styles.smallButton, strategy.onWin !== action.id && styles.violetGhost]} />)}
+                </View>
+                <View style={styles.actionRow}>
+                  <Text style={styles.label}>ON LOSS</Text>
+                  {STEP_ACTIONS.map((action) => <Button key={action.id} label={action.label} variant={strategy.onLoss === action.id ? 'primary' : 'ghost'} onPress={() => updateStrategy({ onLoss: action.id })} style={[styles.smallButton, strategy.onLoss !== action.id && styles.violetGhost]} />)}
+                  <Button label={strategy.loop ? '✓ LOOP' : 'LOOP OFF'} variant={strategy.loop ? 'primary' : 'ghost'} onPress={() => updateStrategy({ loop: !strategy.loop })} style={[styles.smallButton, !strategy.loop && styles.violetGhost]} />
+                </View>
+                <Text style={styles.note}>Tap a step to remove it. Pushes hold in place; without LOOP an advance past the last step stays on it.</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.label}>PROGRESSION</Text>
+                <View style={styles.choicesWrap}>
+                  {progressionOptions.map((option) => (
+                    <Button key={option.id} label={option.name.toUpperCase()} variant={strategy.progression === option.id ? 'primary' : 'ghost'} onPress={() => updateStrategy({ progression: option.id })} style={[styles.smallButton, strategy.progression !== option.id && styles.violetGhost]} />
+                  ))}
+                </View>
+              </>
+            )}
           </View>
-        ))}
+          );
+        })}
       </View>
       <Button label="Save settings" onPress={save} style={styles.save} />
       {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -108,6 +141,7 @@ const styles = StyleSheet.create({
   fields: { flexDirection: 'row', gap: 12 },
   choices: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   choicesWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   label: { color: rouColors.muted, fontWeight: '800', fontSize: 10, letterSpacing: 1.2 },
   violetGhost: { borderColor: rouColors.borderLight },
   strategyBlock: { gap: 8, padding: 10, borderRadius: 10, backgroundColor: rouColors.background, borderWidth: 1, borderColor: '#2c1a45' },

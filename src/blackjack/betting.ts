@@ -62,7 +62,7 @@ export interface ResolvedStrategy {
   nextStep(step: number, roundProfit: number): number;
 }
 
-function applyAction(action: StepAction, step: number, length: number, loop: boolean): number {
+export function applyAction(action: StepAction, step: number, length: number, loop: boolean): number {
   switch (action) {
     case 'reset': return 0;
     case 'hold': return step;

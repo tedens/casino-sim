@@ -115,6 +115,7 @@ export interface GameState {
   totalWagered: number;
   shooterRolls: number;
   shooterCount: number;
+  repeatBets: boolean;
 }
 
 export interface BetRequest {

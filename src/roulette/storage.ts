@@ -31,12 +31,31 @@ export async function saveRouletteSettings(settings: RouletteSettings): Promise<
   await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
+// older saves predate step ladders — fold their single layout into a one-step ladder
+function normalizeStrategy(raw: unknown): SavedRouletteStrategy {
+  const item = raw as SavedRouletteStrategy;
+  const steps = Array.isArray(item.steps) && item.steps.length > 0 ? item.steps : [item.bets];
+  return {
+    id: item.id,
+    name: item.name,
+    steps,
+    bets: steps[0],
+    onWin: item.onWin ?? 'reset',
+    onLoss: item.onLoss ?? 'advance',
+    loop: item.loop ?? false,
+    progression: item.progression ?? 'flat',
+    enabled: !!item.enabled,
+  };
+}
+
 export async function loadRouletteStrategies(): Promise<SavedRouletteStrategy[]> {
   const raw = await AsyncStorage.getItem(STRATEGIES_KEY);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((item) => item && item.bets && typeof item.bets === 'object') : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((item) => item && item.bets && typeof item.bets === 'object').map(normalizeStrategy)
+      : [];
   } catch {
     return [];
   }

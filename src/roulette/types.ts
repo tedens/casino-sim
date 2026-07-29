@@ -34,15 +34,25 @@ export interface SpinRecord {
   runnerNets: Record<string, number>;
 }
 
+import type { StepAction } from '../casino/customStrategies';
+
 export interface SavedRouletteStrategy {
   id: string;
   name: string;
-  /** dollar amount per bet spot, captured from the felt */
+  /** dollar amount per bet spot, captured from the felt — always mirrors steps[0] */
   bets: Record<RouletteBetId, number>;
-  /** betting progression id (preset or custom) scaling the whole layout */
+  /** step ladder of layouts (max 6); wins/losses walk it via onWin/onLoss */
+  steps: Record<RouletteBetId, number>[];
+  onWin: StepAction;
+  onLoss: StepAction;
+  /** advancing past the last step loops to step 1; otherwise holds on the last step */
+  loop: boolean;
+  /** betting progression id (preset or custom) scaling the layout — single-step strategies only */
   progression: string;
   enabled: boolean;
 }
+
+export const MAX_STRATEGY_STEPS = 6;
 
 export interface RunnerState {
   strategyId: string;

@@ -1,5 +1,10 @@
-import { betCovers, bestHit, coveredPockets, createRouletteState, houseEdge, settleBets, spin, syncRunners } from '../roulette/engine';
+import { betCovers, bestHit, coveredPockets, createRouletteState, houseEdge, nextStrategyStep, settleBets, spin, strategyStepBets, syncRunners } from '../roulette/engine';
+import { SavedRouletteStrategy } from '../roulette/types';
 import { POCKET_ORDER, pocketColor, simulateSpin } from '../roulette/wheel';
+
+function strat(partial: Partial<SavedRouletteStrategy> & Pick<SavedRouletteStrategy, 'id' | 'name' | 'bets'>): SavedRouletteStrategy {
+  return { steps: [partial.bets], onWin: 'reset', onLoss: 'advance', loop: false, progression: 'flat', enabled: true, ...partial };
+}
 
 describe('roulette pockets', () => {
   test('colors follow the standard layout', () => {
@@ -115,9 +120,7 @@ describe('roulette session', () => {
   });
 
   test('runners settle their own bankrolls and borrow when broke', () => {
-    let state = syncRunners(fresh(), [
-      { id: 's1', name: 'Reds', bets: { red: 100 }, progression: 'flat', enabled: true },
-    ]);
+    let state = syncRunners(fresh(), [strat({ id: 's1', name: 'Reds', bets: { red: 100 } })]);
     expect(state.runners).toHaveLength(1);
     state = { ...state, runners: [{ ...state.runners[0], bankroll: 40 }] };
     const result = spin(state, { black: 10 }, [{ strategyId: 's1', bets: { red: 100 } }]);
@@ -130,16 +133,49 @@ describe('roulette session', () => {
 
   test('disabling a strategy drops its runner; re-enabling keeps others intact', () => {
     let state = syncRunners(fresh(), [
-      { id: 's1', name: 'A', bets: { red: 10 }, progression: 'flat', enabled: true },
-      { id: 's2', name: 'B', bets: { black: 10 }, progression: 'flat', enabled: true },
+      strat({ id: 's1', name: 'A', bets: { red: 10 } }),
+      strat({ id: 's2', name: 'B', bets: { black: 10 } }),
     ]);
     state = { ...state, runners: state.runners.map((runner) => ({ ...runner, bankroll: 777 })) };
     state = syncRunners(state, [
-      { id: 's1', name: 'A', bets: { red: 10 }, progression: 'flat', enabled: false },
-      { id: 's2', name: 'B', bets: { black: 10 }, progression: 'flat', enabled: true },
+      strat({ id: 's1', name: 'A', bets: { red: 10 }, enabled: false }),
+      strat({ id: 's2', name: 'B', bets: { black: 10 } }),
     ]);
     expect(state.runners).toHaveLength(1);
     expect(state.runners[0].strategyId).toBe('s2');
     expect(state.runners[0].bankroll).toBe(777);
+  });
+});
+
+describe('roulette multi-step strategies', () => {
+  const ladder = strat({
+    id: 'ladder', name: 'Dozens ladder', bets: { dozen1: 5 },
+    steps: [{ dozen1: 5 }, { dozen1: 10 }, { dozen1: 20, red: 5 }],
+  });
+
+  test('each step bets its own layout', () => {
+    expect(strategyStepBets(ladder, 0)).toEqual({ dozen1: 5 });
+    expect(strategyStepBets(ladder, 2)).toEqual({ dozen1: 20, red: 5 });
+    expect(strategyStepBets(ladder, 99)).toEqual({ dozen1: 20, red: 5 });
+  });
+
+  test('losses advance, wins reset, pushes hold', () => {
+    expect(nextStrategyStep(ladder, 0, -5)).toBe(1);
+    expect(nextStrategyStep(ladder, 1, -10)).toBe(2);
+    expect(nextStrategyStep(ladder, 2, -25)).toBe(2); // no loop: holds on the last step
+    expect(nextStrategyStep(ladder, 2, 40)).toBe(0);
+    expect(nextStrategyStep(ladder, 1, 0)).toBe(1);
+  });
+
+  test('loop wraps past the last step; custom actions apply', () => {
+    const looping = { ...ladder, loop: true, onWin: 'stepBack' as const, onLoss: 'advance' as const };
+    expect(nextStrategyStep(looping, 2, -25)).toBe(0);
+    expect(nextStrategyStep(looping, 2, 40)).toBe(1);
+  });
+
+  test('single-step strategies never move', () => {
+    const flat = strat({ id: 'flat', name: 'Flat', bets: { red: 10 } });
+    expect(nextStrategyStep(flat, 0, -10)).toBe(0);
+    expect(nextStrategyStep(flat, 0, 10)).toBe(0);
   });
 });

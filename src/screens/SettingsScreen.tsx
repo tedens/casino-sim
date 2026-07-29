@@ -10,9 +10,10 @@ export function SettingsScreen({ settings, onSave }: { settings: AppSettings; on
   const [maximum, setMaximum] = useState(String(settings.tableMaximum));
   const [speed, setSpeed] = useState(settings.animationSpeed);
   const [showWinnings, setShowWinnings] = useState(settings.showWinnings);
+  const [keepBetsUp, setKeepBetsUp] = useState(settings.keepBetsUp);
   const [message, setMessage] = useState('');
 
-  useEffect(() => { setBankroll(String(settings.startingBankroll)); setMinimum(String(settings.tableMinimum)); setMaximum(String(settings.tableMaximum)); setSpeed(settings.animationSpeed); setShowWinnings(settings.showWinnings); }, [settings]);
+  useEffect(() => { setBankroll(String(settings.startingBankroll)); setMinimum(String(settings.tableMinimum)); setMaximum(String(settings.tableMaximum)); setSpeed(settings.animationSpeed); setShowWinnings(settings.showWinnings); setKeepBetsUp(settings.keepBetsUp); }, [settings]);
 
   const save = () => {
     const next: AppSettings = {
@@ -22,6 +23,7 @@ export function SettingsScreen({ settings, onSave }: { settings: AppSettings; on
       animationSpeed: speed,
       showWinnings,
       selectedChip: settings.selectedChip,
+      keepBetsUp,
     };
     onSave(next);
     setMessage('Saved. New table settings apply when starting a new session.');
@@ -33,6 +35,8 @@ export function SettingsScreen({ settings, onSave }: { settings: AppSettings; on
       <View style={styles.card}>
         <SectionTitle>Table preset</SectionTitle>
         <View style={styles.fields}><Field label="Starting bankroll" value={bankroll} onChangeText={setBankroll} keyboardType="numeric" /><Field label="Table minimum" value={minimum} onChangeText={setMinimum} keyboardType="numeric" /><Field label="Table maximum" value={maximum} onChangeText={setMaximum} keyboardType="numeric" /></View>
+        <Button label={keepBetsUp ? '✓ Winning bets stay up' : 'Winning bets stay up: OFF'} variant={keepBetsUp ? 'primary' : 'ghost'} onPress={() => setKeepBetsUp((value) => !value)} />
+        <Text style={styles.note}>When on, winning Field, Come (on its number), and prop bets collect their winnings and stay locked in for the next roll instead of coming down. Take a bet down any time from the Active Wagers panel — repeat mode also unlocks Come contracts. Applies to new sessions.</Text>
       </View>
       <View style={styles.card}>
         <SectionTitle>Dice animation</SectionTitle>

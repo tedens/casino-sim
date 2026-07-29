@@ -134,6 +134,8 @@ export function validateWagerForRoll(state: GameState, wager: Wager): Validation
 
 export function canRemoveWager(state: GameState, wager: Wager): ValidationResult {
   if (state.locked) return { valid: false, message: 'Bets are locked.' };
+  // In repeat mode the player owns every bet: contracts can be pulled between rolls.
+  if (state.repeatBets) return { valid: true };
   if ((wager.kind === 'pass' || wager.kind === 'come') && wager.contract) {
     return { valid: false, message: 'This is a locked contract bet.' };
   }

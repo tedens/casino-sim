@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BaccaratSettings, DEFAULT_BACCARAT_SETTINGS, loadBaccaratSettings, saveBaccaratSettings } from './src/baccarat/storage';
 import { bacColors } from './src/baccarat/theme';
@@ -62,6 +62,8 @@ const LABS: Array<{ id: LabId; title: string; subtitle: string }> = [
 ];
 
 export default function App() {
+  const { width: windowWidth } = useWindowDimensions();
+  const narrow = windowWidth < 700;
   const [lab, setLab] = useState<LabId>('craps');
   const [labMenuOpen, setLabMenuOpen] = useState(false);
   const [crapsScreen, setCrapsScreen] = useState<CrapsScreen>('table');
@@ -140,9 +142,9 @@ export default function App() {
   return (
     <SafeAreaView style={[styles.safe, blue && styles.safeBlue, wine && styles.safeWine, violet && styles.safeViolet]}>
       <StatusBar style="light" />
-      <View style={styles.app}>
-        <View style={[styles.nav, blue && styles.navBlue, wine && styles.navWine, violet && styles.navViolet]}>
-          <Pressable onPress={() => setLabMenuOpen((open) => !open)} style={[styles.brand, labMenuOpen && styles.brandOpen]} accessibilityLabel="Switch lab simulator">
+      <View style={[styles.app, narrow && styles.appNarrow]}>
+        <View style={[styles.nav, blue && styles.navBlue, wine && styles.navWine, violet && styles.navViolet, narrow && styles.navNarrow]}>
+          <Pressable onPress={() => setLabMenuOpen((open) => !open)} style={[styles.brand, narrow && styles.brandNarrow, labMenuOpen && styles.brandOpen]} accessibilityLabel="Switch lab simulator">
             <Text style={styles.diamond}>◆</Text>
             <View>
               <Text style={styles.brandText}>{activeLab.title}</Text>
@@ -153,13 +155,13 @@ export default function App() {
             <Pressable
               key={item.id}
               onPress={() => (blue ? setBlackjackScreen(item.id as BlackjackScreen) : wine ? setBaccaratScreen(item.id as BaccaratScreen) : violet ? setRouletteScreen(item.id as RouletteScreen) : setCrapsScreen(item.id as CrapsScreen))}
-              style={[styles.navItem, activeScreen === item.id && (blue ? styles.navItemActiveBlue : wine ? styles.navItemActiveWine : violet ? styles.navItemActiveViolet : styles.navItemActive)]}
+              style={[styles.navItem, narrow && styles.navItemNarrow, activeScreen === item.id && (blue ? styles.navItemActiveBlue : wine ? styles.navItemActiveWine : violet ? styles.navItemActiveViolet : styles.navItemActive)]}
             >
               <Text style={[styles.navShort, blue && styles.navShortBlue, wine && styles.navShortWine, activeScreen === item.id && styles.navTextActive]}>{item.short}</Text>
               {item.label.toUpperCase() !== item.short ? <Text style={[styles.navLabel, blue && styles.navLabelBlue, wine && styles.navLabelWine, activeScreen === item.id && styles.navTextActive]}>{item.label}</Text> : null}
             </Pressable>
           ))}
-          <View style={styles.offline}><View style={styles.offlineDot} /><Text style={styles.offlineText}>OFFLINE</Text></View>
+          {!narrow ? <View style={styles.offline}><View style={styles.offlineDot} /><Text style={styles.offlineText}>OFFLINE</Text></View> : null}
         </View>
         <View style={styles.main}>
           {green && crapsScreen === 'table' ? <GameScreen strategies={strategies} selectedStrategyId={selectedStrategyId} onSelectStrategy={setSelectedStrategyId} settings={settings} onChangeSettings={changeSettings} /> : null}
@@ -178,7 +180,7 @@ export default function App() {
         {labMenuOpen ? (
           <>
             <Pressable style={styles.menuBackdrop} onPress={() => setLabMenuOpen(false)} accessibilityLabel="Close lab menu" />
-            <View style={styles.labMenu}>
+            <View style={[styles.labMenu, narrow && styles.labMenuNarrow]}>
               <Text style={styles.labMenuTitle}>CHOOSE A GAME · {LABS.length} TABLES</Text>
               {LABS.map((item) => (
                 <Pressable key={item.id} onPress={() => switchLab(item.id)} style={[styles.labOption, item.id === 'blackjack' ? styles.labOptionBlue : item.id === 'baccarat' ? styles.labOptionWine : item.id === 'roulette' ? styles.labOptionViolet : styles.labOptionGreen, lab === item.id && styles.labOptionActive]}>
@@ -201,17 +203,22 @@ const styles = StyleSheet.create({
   safeWine: { backgroundColor: '#160a0d' },
   safeViolet: { backgroundColor: '#100a18' },
   app: { flex: 1, flexDirection: 'row' },
-  nav: { width: 82, backgroundColor: '#07140f', borderRightWidth: 1, borderRightColor: '#29483d', paddingVertical: 9, alignItems: 'stretch' },
-  navBlue: { backgroundColor: '#070c17', borderRightColor: '#2b3a56' },
-  navWine: { backgroundColor: '#160a0d', borderRightColor: '#4a222c' },
-  navViolet: { backgroundColor: '#100a18', borderRightColor: '#3c2560' },
+  appNarrow: { flexDirection: 'column' },
+  nav: { width: 82, backgroundColor: '#07140f', borderRightWidth: 1, borderRightColor: '#29483d', borderBottomColor: '#29483d', paddingVertical: 9, alignItems: 'stretch' },
+  navBlue: { backgroundColor: '#070c17', borderRightColor: '#2b3a56', borderBottomColor: '#2b3a56' },
+  navWine: { backgroundColor: '#160a0d', borderRightColor: '#4a222c', borderBottomColor: '#4a222c' },
+  navViolet: { backgroundColor: '#100a18', borderRightColor: '#3c2560', borderBottomColor: '#3c2560' },
+  // phones: the side rail becomes a slim top bar
+  navNarrow: { width: '100%', flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 4, borderRightWidth: 0, borderBottomWidth: 1 },
   brand: { height: 62, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderRadius: 9, marginHorizontal: 5 },
+  brandNarrow: { height: 46, paddingHorizontal: 8 },
   brandOpen: { backgroundColor: 'rgba(213,174,83,0.12)' },
   diamond: { color: colors.gold, fontSize: 19 },
   brandText: { color: colors.ink, fontSize: 10, fontWeight: '900', lineHeight: 10, letterSpacing: 1 },
   brandCaret: { color: '#6f9284', fontSize: 7, fontWeight: '900', letterSpacing: 0.8, marginTop: 3 },
   brandCaretBlue: { color: '#7286a5' },
   navItem: { marginHorizontal: 7, marginVertical: 3, minHeight: 57, borderRadius: 9, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'transparent' },
+  navItemNarrow: { flex: 1, minHeight: 42, marginHorizontal: 2, marginVertical: 0 },
   navItemActive: { backgroundColor: colors.panelLight, borderColor: '#426959' },
   navItemActiveBlue: { backgroundColor: bjColors.panelLight, borderColor: '#42598a' },
   navItemActiveWine: { backgroundColor: bacColors.panelLight, borderColor: '#7c3345' },
@@ -229,6 +236,7 @@ const styles = StyleSheet.create({
   main: { flex: 1 },
   menuBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)', zIndex: 40 },
   labMenu: { position: 'absolute', top: 12, left: 90, width: 250, borderRadius: 14, padding: 12, gap: 8, backgroundColor: '#0c1310', borderWidth: 1, borderColor: colors.gold, shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 16, zIndex: 50 },
+  labMenuNarrow: { top: 58, left: 10 },
   labMenuTitle: { color: colors.gold, fontSize: 9, fontWeight: '900', letterSpacing: 1.6 },
   labOption: { borderRadius: 10, padding: 12, gap: 2, borderWidth: 1 },
   labOptionGreen: { backgroundColor: '#0a2b21', borderColor: '#2c5a4a' },

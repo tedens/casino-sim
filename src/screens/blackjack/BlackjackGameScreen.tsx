@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { progressionBet, resolveStrategy } from '../../blackjack/betting';
 import { CustomBettingStrategy, loadCustomStrategies } from '../../casino/customStrategies';
 import { StrategyOverrides, loadStrategyOverrides } from '../../blackjack/strategyOverrides';
@@ -23,7 +23,7 @@ const CHART_PALETTE: ChartPalette = {
   danger: bjColors.danger,
 };
 
-const CHIP_VALUES = [1, 5, 25, 100, 500];
+const CHIP_VALUES = [1, 5, 10, 25, 50, 100, 500];
 const WATCH_SPEEDS = [250, 750, 1500, 3000];
 
 // verdict on a round where the edited card diverged from the book, judged against
@@ -323,6 +323,10 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
   const tweakPushes = tagValues.filter((item) => item.tag === 'push').length;
   const tweakDelta = tagValues.reduce((sum, item) => sum + (item.delta ?? 0), 0);
 
+  const { width: windowWidth } = useWindowDimensions();
+  const narrow = windowWidth < 900;
+  const TableWrap = (narrow ? ScrollView : View) as typeof View;
+
   return (
     <View style={styles.screen}>
       <View style={styles.topbar}>
@@ -336,8 +340,8 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
         <Button label="New session" variant="secondary" onPress={reset} style={styles.blueSecondary} />
       </View>
 
-      <View style={styles.body}>
-        <View style={styles.tableColumn}>
+      <View style={[styles.body, narrow && styles.bodyNarrow]}>
+        {!narrow || !showPanel ? <TableWrap style={[styles.tableColumn, narrow && styles.tableColumnNarrow]}>
           <View style={styles.tableRail}>
             <View style={styles.felt}>
               <View style={styles.feltGlowOne} /><View style={styles.feltGlowTwo} />
@@ -439,9 +443,9 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
               />
             </View>
           </View>
-        </View>
+        </TableWrap> : null}
 
-        {showPanel ? <ScrollView style={styles.sidePanel} contentContainerStyle={styles.sideContent}>
+        {showPanel ? <ScrollView style={[styles.sidePanel, narrow && styles.sidePanelNarrow]} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={game.profitSeries} title="SESSION P/L" pointLabel="Round" palette={CHART_PALETTE} />
           {game.botRoster.length > 0 ? (
             <>
@@ -499,14 +503,16 @@ export function BlackjackGameScreen({ settings, onChangeSettings }: {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, minHeight: 0, backgroundColor: bjColors.background },
-  topbar: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 22, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: '#232c3d', backgroundColor: '#080c15' },
+  topbar: { minHeight: 72, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#232c3d', backgroundColor: '#080c15' },
   eyebrow: { color: bjColors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginBottom: 2 },
   bigMoney: { fontSize: 22 },
   shoeCount: { color: bjColors.gold, fontSize: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
   topbarSpace: { flex: 1 },
   hintToggle: { minWidth: 118 },
   body: { flex: 1, minHeight: 0, flexDirection: 'row' },
+  bodyNarrow: { flexDirection: 'column' },
   tableColumn: { flex: 1.75, minWidth: 560, minHeight: 0 },
+  tableColumnNarrow: { flex: 1, minWidth: 0 },
   tableRail: { flex: 1, minHeight: 430, margin: 7, padding: 9, borderRadius: 40, backgroundColor: '#191426', borderWidth: 2, borderColor: '#3d3a5c', shadowColor: '#000', shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   felt: { flex: 1, minHeight: 410, backgroundColor: bjColors.felt, borderWidth: 2, borderColor: '#4a6ea3', borderRadius: 30, paddingHorizontal: 18, paddingVertical: 14, overflow: 'hidden' },
   feltGlowOne: { position: 'absolute', width: 340, height: 340, borderRadius: 170, left: '12%', top: '10%', backgroundColor: 'rgba(255,255,255,0.015)' },
@@ -548,21 +554,22 @@ const styles = StyleSheet.create({
   cardBackInner: { flex: 1, borderRadius: 5, borderWidth: 1.5, borderColor: 'rgba(220,228,245,0.5)', alignItems: 'center', justifyContent: 'center' },
   cardBackMark: { color: 'rgba(220,228,245,0.7)', fontSize: 18 },
   controls: { minHeight: 150, paddingHorizontal: 10, paddingVertical: 8, gap: 4, borderTopWidth: 1, borderTopColor: '#242b3a', backgroundColor: bjColors.panel },
-  automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#2b3450', paddingTop: 4 },
+  automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#2b3450', paddingTop: 4 },
   watchLabel: { color: bjColors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1, marginLeft: 5 },
   speedButton: { minHeight: 29, minWidth: 43, paddingHorizontal: 6 },
   watchButton: { minHeight: 31, minWidth: 128, marginLeft: 'auto' },
-  controlMain: { flex: 1, width: '100%', flexDirection: 'row', alignItems: 'center', gap: 10 },
-  chipTray: { flexDirection: 'row', alignItems: 'center' },
+  controlMain: { flex: 1, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  chipTray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   rollArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   message: { flex: 1, color: bjColors.muted, fontSize: 11 },
   dealButton: { minWidth: 122, minHeight: 58 },
-  actionRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  actionRow: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   actionButton: { minHeight: 52, minWidth: 96 },
   recommendedButton: { shadowColor: bjColors.gold, shadowOpacity: 0.7, shadowRadius: 9 },
   blueSecondary: { borderColor: bjColors.borderLight, backgroundColor: bjColors.panelLight },
   blueGhost: { borderColor: bjColors.border },
   sidePanel: { flex: 1, minWidth: 320, minHeight: 0, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: '#242b3a', backgroundColor: bjColors.panel },
+  sidePanelNarrow: { minWidth: 0, maxWidth: undefined, borderLeftWidth: 0 },
   sideContent: { padding: 14, gap: 9 },
   panelSubtitle: { color: bjColors.ink, fontWeight: '900', fontSize: 14, marginTop: 7 },
   empty: { color: bjColors.muted, fontStyle: 'italic' },

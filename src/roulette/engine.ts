@@ -1,3 +1,4 @@
+import { applyAction } from '../blackjack/betting';
 import { deriveSeed } from '../domain/rng';
 import { POCKET_ORDER, pocketColor, simulateSpin } from './wheel';
 import { RouletteBetId, RouletteRules, RouletteState, RunnerState, SavedRouletteStrategy, SpinRecord, WheelKind } from './types';
@@ -84,6 +85,20 @@ export function bestHit(bets: Record<RouletteBetId, number>, wheel: WheelKind): 
     best = Math.max(best, settleBets(bets, pocket).net);
   }
   return best;
+}
+
+// current-step layout for a strategy; single-step ladders just return their base layout
+export function strategyStepBets(strategy: SavedRouletteStrategy, step: number): Record<RouletteBetId, number> {
+  const steps = strategy.steps?.length ? strategy.steps : [strategy.bets];
+  return steps[Math.min(Math.max(step, 0), steps.length - 1)];
+}
+
+// walk the step ladder from a spin's net; pushes hold in place
+export function nextStrategyStep(strategy: SavedRouletteStrategy, step: number, net: number): number {
+  const length = strategy.steps?.length ? strategy.steps.length : 1;
+  const clamped = Math.min(Math.max(step, 0), length - 1);
+  if (length <= 1 || net === 0) return clamped;
+  return applyAction(net > 0 ? strategy.onWin : strategy.onLoss, clamped, length, strategy.loop);
 }
 
 export function createRouletteState(options: { seed: string; startingBankroll?: number; rules?: Partial<RouletteRules> }): RouletteState {
