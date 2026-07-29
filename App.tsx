@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { BaccaratSettings, DEFAULT_BACCARAT_SETTINGS, loadBaccaratSettings, saveBaccaratSettings } from './src/baccarat/storage';
 import { bacColors } from './src/baccarat/theme';
@@ -140,7 +141,8 @@ export default function App() {
   const activeScreen = blue ? blackjackScreen : wine ? baccaratScreen : violet ? rouletteScreen : crapsScreen;
 
   return (
-    <SafeAreaView style={[styles.safe, blue && styles.safeBlue, wine && styles.safeWine, violet && styles.safeViolet]}>
+    <SafeAreaProvider>
+    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={[styles.safe, blue && styles.safeBlue, wine && styles.safeWine, violet && styles.safeViolet]}>
       <StatusBar style="light" />
       <View style={[styles.app, narrow && styles.appNarrow]}>
         <View style={[styles.nav, blue && styles.navBlue, wine && styles.navWine, violet && styles.navViolet, narrow && styles.navNarrow]}>
@@ -194,6 +196,7 @@ export default function App() {
         ) : null}
       </View>
     </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
