@@ -223,11 +223,18 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
 
   const { width: windowWidth } = useWindowDimensions();
   const narrow = windowWidth < 900;
-  const TableWrap = (narrow ? ScrollView : View) as typeof View;
+  const phone = windowWidth < 500;
+  const BodyWrap = (narrow ? ScrollView : View) as typeof View;
+  const SideWrap = (narrow ? View : ScrollView) as typeof ScrollView;
+
+  const TopBar = ({ children }: { children: React.ReactNode }) => phone
+    ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topbarScroller} contentContainerStyle={styles.topbarRow}>{children}</ScrollView>
+    : <View style={styles.topbar}>{children}</View>;
+
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topbar}>
+      <TopBar>
         <View><Text style={styles.eyebrow}>BANKROLL</Text><Money value={game.bankroll} style={styles.bigMoney} /></View>
         <View><Text style={styles.eyebrow}>ON TABLE</Text><Money value={pendingTotal} /></View>
         <View><Text style={styles.eyebrow}>SESSION</Text><Money value={profit} signed style={{ color: profit >= 0 ? bacColors.success : bacColors.danger }} /></View>
@@ -235,12 +242,12 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
         <View style={styles.topbarSpace} />
         <Button label={showPanel ? '✓ HISTORY' : 'HISTORY'} variant={showPanel ? 'secondary' : 'ghost'} onPress={() => setShowPanel((value) => !value)} style={showPanel ? styles.wineSecondary : styles.wineGhost} />
         <Button label="New session" variant="secondary" onPress={reset} style={styles.wineSecondary} />
-      </View>
+      </TopBar>
 
-      <View style={[styles.body, narrow && styles.bodyNarrow]}>
-        {!narrow || !showPanel ? <TableWrap style={[styles.tableColumn, narrow && styles.tableColumnNarrow]}>
-          <View style={styles.tableRail}>
-            <View style={styles.felt}>
+      <BodyWrap style={[styles.body, narrow && styles.bodyNarrow]}>
+        {!narrow || !showPanel ? <View style={[styles.tableColumn, narrow && styles.tableColumnNarrow]}>
+          <View style={[styles.tableRail, phone && styles.tableRailPhone]}>
+            <View style={[styles.felt, phone && styles.feltPhone]}>
               <Text style={styles.rulesArc}>{rulesLine}</Text>
               <View style={styles.handsRow}>
                 <View style={styles.handBox}>
@@ -282,9 +289,9 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
             </View>
           </View>
 
-          <View style={styles.controls}>
+          <View style={[styles.controls, phone && styles.controlsPhone]}>
             <View style={styles.controlMain}>
-              <View style={styles.chipTray}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} selected={chip === value} onPress={() => setChip(value)} />)}</View>
+              <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={phone} selected={chip === value} onPress={() => setChip(value)} />)}</View>
               <View style={styles.rollArea}>
                 <Text style={styles.message} numberOfLines={2}>{message}</Text>
                 <Button
@@ -315,9 +322,9 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
               />
             </View>
           </View>
-        </TableWrap> : null}
+        </View> : null}
 
-        {showPanel ? <ScrollView style={[styles.sidePanel, narrow && styles.sidePanelNarrow]} contentContainerStyle={styles.sideContent}>
+        {showPanel ? <SideWrap style={[styles.sidePanel, narrow && styles.sidePanelNarrow, narrow && styles.sideContent]} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={game.profitSeries} title="SESSION P/L" pointLabel="Coup" palette={CHART_PALETTE} />
           <BeadRoad road={game.beadRoad} shoeNumber={game.shoeNumber} />
           <Text style={styles.panelSubtitle}>Coup history</Text>
@@ -334,8 +341,8 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
           <Text style={styles.note}>Punto banco tableau: player draws on 0–5 and stands on 6–7; the banker's third card follows the standard tableau against the player's third. Naturals (8 or 9) freeze both hands. The shoe reshuffles with a fresh seed and a new cut, exactly like the blackjack lab.</Text>
           <Text style={styles.seed} selectable>Session seed: {game.seed}</Text>
           <Text style={styles.seed} selectable>Shoe #{game.shoeNumber} seed: {game.shoeSeed}{game.shoeNumber > 1 ? ' (rotated at shuffle)' : ''}</Text>
-        </ScrollView> : null}
-      </View>
+        </SideWrap> : null}
+      </BodyWrap>
     </View>
   );
 }
@@ -343,6 +350,8 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
 const styles = StyleSheet.create({
   screen: { flex: 1, minHeight: 0, backgroundColor: bacColors.background },
   topbar: { minHeight: 72, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#33161d', backgroundColor: '#160a0d' },
+  topbarScroller: { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: '#33161d', backgroundColor: '#160a0d' },
+  topbarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 7 },
   eyebrow: { color: bacColors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginBottom: 2 },
   bigMoney: { fontSize: 22 },
   shoeCount: { color: bacColors.gold, fontSize: 15, fontWeight: '900', fontVariant: ['tabular-nums'] },
@@ -350,7 +359,10 @@ const styles = StyleSheet.create({
   body: { flex: 1, minHeight: 0, flexDirection: 'row' },
   bodyNarrow: { flexDirection: 'column' },
   tableColumn: { flex: 1.75, minWidth: 560, minHeight: 0 },
-  tableColumnNarrow: { flex: 1, minWidth: 0 },
+  tableColumnNarrow: { flex: undefined, minWidth: 0 },
+  tableRailPhone: { minHeight: 320, margin: 4, padding: 6, borderRadius: 22 },
+  feltPhone: { minHeight: 304, paddingHorizontal: 8, paddingVertical: 8, borderRadius: 16 },
+  controlsPhone: { minHeight: 0, paddingVertical: 4 },
   tableRail: { flex: 1, minHeight: 400, margin: 7, padding: 9, borderRadius: 40, backgroundColor: '#241016', borderWidth: 2, borderColor: '#54262f', shadowColor: '#000', shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   felt: { flex: 1, minHeight: 380, backgroundColor: bacColors.felt, borderWidth: 2, borderColor: '#8a4152', borderRadius: 30, paddingHorizontal: 18, paddingVertical: 14, overflow: 'hidden' },
   rulesArc: { color: 'rgba(230,200,205,0.6)', fontWeight: '900', fontSize: 9, letterSpacing: 2, textAlign: 'center', marginBottom: 10 },
@@ -377,8 +389,9 @@ const styles = StyleSheet.create({
   controls: { minHeight: 150, paddingHorizontal: 10, paddingVertical: 8, gap: 4, borderTopWidth: 1, borderTopColor: '#33161d', backgroundColor: bacColors.panel },
   controlMain: { flex: 1, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   chipTray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
+  chipTrayPhone: { width: '100%', justifyContent: 'center', gap: 4 },
   rollArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  message: { flex: 1, color: bacColors.muted, fontSize: 11 },
+  message: { flex: 1, minWidth: 0, color: bacColors.muted, fontSize: 11 },
   dealButton: { minWidth: 132, minHeight: 58 },
   automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#3d1822', paddingTop: 4 },
   watchLabel: { color: bacColors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1, marginLeft: 5 },
@@ -388,7 +401,7 @@ const styles = StyleSheet.create({
   wineSecondary: { borderColor: bacColors.borderLight, backgroundColor: bacColors.panelLight },
   wineGhost: { borderColor: bacColors.border },
   sidePanel: { flex: 1, minWidth: 320, minHeight: 0, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: '#33161d', backgroundColor: bacColors.panel },
-  sidePanelNarrow: { minWidth: 0, maxWidth: undefined, borderLeftWidth: 0 },
+  sidePanelNarrow: { flex: undefined, width: '100%', minWidth: 0, maxWidth: undefined, borderLeftWidth: 0 },
   sideContent: { padding: 14, gap: 9 },
   panelSubtitle: { color: bacColors.ink, fontWeight: '900', fontSize: 14, marginTop: 7 },
   empty: { color: bacColors.muted, fontStyle: 'italic' },

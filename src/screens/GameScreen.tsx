@@ -451,12 +451,19 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
 
   const { width: windowWidth } = useWindowDimensions();
   const narrow = windowWidth < 900;
-  const TableWrap = (narrow ? ScrollView : View) as typeof View;
+  const phone = windowWidth < 500;
+  const BodyWrap = (narrow ? ScrollView : View) as typeof View;
+  const SideWrap = (narrow ? View : ScrollView) as typeof ScrollView;
+
+  const TopBar = ({ children }: { children: React.ReactNode }) => phone
+    ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topbarScroller} contentContainerStyle={styles.topbarRow}>{children}</ScrollView>
+    : <View style={styles.topbar}>{children}</View>;
+
 
   return (
     <View style={styles.screen}>
       {winFlash !== null ? <View pointerEvents="none" style={styles.winFlash}><Text style={styles.winFlashText}>{formatMoney(winFlash, true)}</Text><Text style={styles.winFlashLabel}>WIN</Text></View> : null}
-      <View style={styles.topbar}>
+      <TopBar>
         <View><Text style={styles.eyebrow}>BANKROLL</Text><Money value={game.bankroll} style={styles.bigMoney} /></View>
         <View><Text style={styles.eyebrow}>ON TABLE</Text><Money value={game.wagers.reduce((sum, wager) => sum + wager.amount, 0)} /></View>
         <View><Text style={styles.eyebrow}>SESSION</Text><Money value={sessionProfit(game)} signed style={{ color: sessionProfit(game) >= 0 ? colors.success : colors.danger }} /></View>
@@ -470,12 +477,12 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
           </ScrollView>
         </View>
         <Button label="New session" variant="secondary" onPress={reset} />
-      </View>
+      </TopBar>
 
-      <View style={[styles.body, narrow && styles.bodyNarrow]}>
-        <TableWrap style={[styles.tableColumn, narrow && styles.tableColumnNarrow]}>
-          <View style={styles.tableRail}>
-          <View style={styles.felt} onLayout={handleFeltLayout}>
+      <BodyWrap style={[styles.body, narrow && styles.bodyNarrow]}>
+        <View style={[styles.tableColumn, narrow && styles.tableColumnNarrow]}>
+          <View style={[styles.tableRail, phone && styles.tableRailPhone]}>
+          <View style={[styles.felt, phone && styles.feltPhone]} onLayout={handleFeltLayout}>
             <View style={styles.feltWearOne} /><View style={styles.feltWearTwo} />
             <View style={styles.wallLabel}>
               <View style={styles.pyramidRail}>{Array.from({ length: 34 }, (_, index) => <View key={index} style={[styles.railPyramid, index % 2 === 0 && styles.railPyramidDim]} />)}</View>
@@ -532,13 +539,13 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
           </View>
           </View>
 
-          <View style={styles.controls}>
+          <View style={[styles.controls, phone && styles.controlsPhone]}>
             <View style={styles.controlMain}>
-            <View style={styles.chipTray}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} selected={chip === value} onPress={() => selectChip(value)} />)}</View>
-            {diceLocation === 'tray' ? <DiceResult faces={dice as [1 | 2 | 3 | 4 | 5 | 6, 1 | 2 | 3 | 4 | 5 | 6]} /> : <View style={styles.diceResultPlaceholder} />}
+            <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={phone} selected={chip === value} onPress={() => selectChip(value)} />)}</View>
+            {!phone ? (diceLocation === 'tray' ? <DiceResult faces={dice as [1 | 2 | 3 | 4 | 5 | 6, 1 | 2 | 3 | 4 | 5 | 6]} /> : <View style={styles.diceResultPlaceholder} />) : null}
             <View style={styles.rollArea}>
               <Text style={[styles.message, rollBlockReason ? styles.blockReason : null]} numberOfLines={2}>{rollBlockReason || message}</Text>
-              <Button label={rolling ? 'ROLLING…' : 'ROLL DICE'} onPress={doRoll} disabled={!canRoll} style={styles.rollButton} />
+              <Button label={rolling ? 'ROLLING…' : 'ROLL DICE'} onPress={doRoll} disabled={!canRoll} style={[styles.rollButton, phone && styles.mainButtonPhone]} />
             </View>
             </View>
             <View style={styles.automationBar}>
@@ -549,9 +556,9 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
               <Button label={watching ? 'STOP WATCH' : 'WATCH STRATEGY'} variant={watching ? 'danger' : 'secondary'} onPress={() => watching ? stopWatching() : startWatching()} disabled={rolling && !watching} style={styles.watchButton} />
             </View>
           </View>
-        </TableWrap>
+        </View>
 
-        <ScrollView style={[styles.sidePanel, narrow && styles.sidePanelNarrow]} contentContainerStyle={styles.sideContent}>
+        <SideWrap style={[styles.sidePanel, narrow && styles.sidePanelNarrow, narrow && styles.sideContent]} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={profitSeries} title="REALIZED P/L" pointLabel="Roll" palette={CHART_PALETTE} />
 
           <Text style={styles.panelSubtitle}>Roll history</Text>
@@ -626,8 +633,8 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
           ) : null}
 
           {latest ? <Text style={styles.seed} selectable>Seed: {game.seed}</Text> : null}
-        </ScrollView>
-      </View>
+        </SideWrap>
+      </BodyWrap>
     </View>
   );
 }
@@ -662,6 +669,8 @@ const styles = StyleSheet.create({
   winFlashText: { color: '#f4cc62', fontSize: 48, lineHeight: 52, fontWeight: '900', fontVariant: ['tabular-nums'], textShadowColor: '#7c5512', textShadowRadius: 8 },
   winFlashLabel: { color: '#d6b55e', fontSize: 8, fontWeight: '900', letterSpacing: 3 },
   topbar: { minHeight: 72, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#2f352f', backgroundColor: '#080d0b' },
+  topbarScroller: { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: '#2f352f', backgroundColor: '#080d0b' },
+  topbarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 7 },
   eyebrow: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginBottom: 2 },
   bigMoney: { fontSize: 22 },
   shooterNumber: { color: colors.gold, fontSize: 18, fontWeight: '900', fontVariant: ['tabular-nums'] },
@@ -673,7 +682,11 @@ const styles = StyleSheet.create({
   body: { flex: 1, minHeight: 0, flexDirection: 'row' },
   bodyNarrow: { flexDirection: 'column' },
   tableColumn: { flex: 1.75, minWidth: 600, minHeight: 0 },
-  tableColumnNarrow: { flex: 2.1, minWidth: 0 },
+  tableColumnNarrow: { flex: undefined, minWidth: 0 },
+  tableRailPhone: { minHeight: 330, margin: 4, padding: 6, borderRadius: 22 },
+  feltPhone: { minHeight: 314, paddingTop: 32, paddingHorizontal: 7, borderRadius: 16 },
+  controlsPhone: { minHeight: 0, paddingVertical: 4 },
+  mainButtonPhone: { minWidth: 96, minHeight: 46 },
   tableRail: { flex: 1, minHeight: 430, margin: 7, padding: 9, borderRadius: 40, backgroundColor: '#24170f', borderWidth: 2, borderColor: '#5a3e29', shadowColor: '#000', shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   felt: { flex: 1, minHeight: 410, backgroundColor: colors.felt, borderWidth: 2, borderColor: '#8f7543', borderRadius: 30, paddingHorizontal: 14, paddingBottom: 9, paddingTop: 38, overflow: 'hidden' },
   feltWearOne: { position: 'absolute', width: 310, height: 310, borderRadius: 155, left: '15%', top: '18%', backgroundColor: 'rgba(255,255,255,0.012)' },
@@ -719,9 +732,10 @@ const styles = StyleSheet.create({
   controls: { minHeight: 154, paddingHorizontal: 10, paddingVertical: 5, gap: 4, borderTopWidth: 1, borderTopColor: '#292f2b', backgroundColor: colors.panel },
   controlMain: { flex: 1, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   chipTray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
+  chipTrayPhone: { width: '100%', justifyContent: 'center', gap: 4 },
   diceResultPlaceholder: { width: 106, height: 58 },
   rollArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  message: { flex: 1, color: colors.muted, fontSize: 11 },
+  message: { flex: 1, minWidth: 0, color: colors.muted, fontSize: 11 },
   blockReason: { color: '#e8b551', fontWeight: '800' },
   rollButton: { minWidth: 122, minHeight: 58 },
   automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#303832', paddingTop: 4 },
@@ -730,7 +744,7 @@ const styles = StyleSheet.create({
   speedButton: { minHeight: 29, minWidth: 43, paddingHorizontal: 6 },
   watchButton: { minHeight: 31, minWidth: 128, marginLeft: 'auto' },
   sidePanel: { flex: 1, minWidth: 340, minHeight: 0, maxWidth: 520, borderLeftWidth: 1, borderLeftColor: '#343b36', backgroundColor: colors.panel },
-  sidePanelNarrow: { minWidth: 0, maxWidth: undefined, borderLeftWidth: 0, borderTopWidth: 1, borderTopColor: '#343b36' },
+  sidePanelNarrow: { flex: undefined, width: '100%', minWidth: 0, maxWidth: undefined, borderLeftWidth: 0, borderTopWidth: 1, borderTopColor: '#343b36' },
   sideContent: { padding: 14, gap: 9 },
   panelTitle: { color: colors.ink, fontWeight: '900', fontSize: 20 },
   panelSubtitle: { color: colors.ink, fontWeight: '900', fontSize: 14, marginTop: 7 },

@@ -232,6 +232,11 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
 
   const { width: windowWidth } = useWindowDimensions();
   const narrow = windowWidth < 900;
+  const phone = windowWidth < 500;
+  const TopBar = ({ children }: { children: React.ReactNode }) => phone
+    ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topbarScroller} contentContainerStyle={styles.topbarRow}>{children}</ScrollView>
+    : <View style={styles.topbar}>{children}</View>;
+
   const total = totalStake(pendingBets);
   const covered = coveredPockets(pendingBets, game.rules.wheel);
   const pocketCount = POCKET_ORDER[game.rules.wheel].length;
@@ -245,7 +250,7 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topbar}>
+      <TopBar>
         <View><Text style={styles.eyebrow}>BANKROLL</Text><Money value={game.bankroll} style={styles.bigMoney} /></View>
         <View><Text style={styles.eyebrow}>ON TABLE</Text><Money value={total} /></View>
         <View><Text style={styles.eyebrow}>SESSION</Text><Money value={profit} signed style={{ color: profit >= 0 ? rouColors.success : rouColors.danger }} /></View>
@@ -253,12 +258,12 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
         <View style={styles.topbarSpace} />
         <Button label={showPanel ? '✓ HISTORY' : 'HISTORY'} variant={showPanel ? 'secondary' : 'ghost'} onPress={() => setShowPanel((value) => !value)} style={showPanel ? styles.violetSecondary : styles.violetGhost} />
         <Button label="New session" variant="secondary" onPress={reset} style={styles.violetSecondary} />
-      </View>
+      </TopBar>
 
       <View style={[styles.body, narrow && styles.bodyNarrow]}>
         {!narrow || !showPanel ? <ScrollView style={[styles.tableColumn, narrow && styles.tableColumnNarrow]} contentContainerStyle={styles.tableContent}>
           <View style={styles.wheelRow}>
-            <RouletteWheel wheel={game.rules.wheel} trace={game.lastTrace} spinning={spinning} speed={speed} size={210} />
+            <RouletteWheel wheel={game.rules.wheel} trace={game.lastTrace} spinning={spinning} speed={speed} size={phone ? 168 : 210} />
             <View style={styles.wheelSide}>
               <Text style={styles.wheelKind}>{wheelLabel}</Text>
               {game.lastPocket && !spinning ? <PocketBadge pocket={game.lastPocket} size={56} /> : null}
@@ -367,9 +372,9 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
         </ScrollView> : null}
       </View>
 
-      <View style={styles.controls}>
+      <View style={[styles.controls, phone && styles.controlsPhone]}>
         <View style={styles.controlMain}>
-          <View style={styles.chipTray}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} selected={chip === value} onPress={() => setChip(value)} />)}</View>
+          <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={phone} selected={chip === value} onPress={() => setChip(value)} />)}</View>
           <View style={styles.rollArea}>
             <Text style={styles.message} numberOfLines={2}>{message}</Text>
             <Button label="CLEAR" variant="ghost" onPress={() => setPendingBets({})} disabled={total === 0 || spinning} style={styles.violetGhost} />
@@ -377,7 +382,7 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
               label={spinning ? 'SPINNING…' : autoOn ? `SPIN NOW${countdown !== null ? ` (${countdown}s)` : ''}` : 'SPIN'}
               onPress={() => (autoOn ? doSpin() : startSpin())}
               disabled={spinning}
-              style={styles.spinButton}
+              style={[styles.spinButton, phone && styles.spinButtonPhone]}
             />
           </View>
         </View>
@@ -401,6 +406,8 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
 const styles = StyleSheet.create({
   screen: { flex: 1, minHeight: 0, backgroundColor: rouColors.background },
   topbar: { minHeight: 72, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#241536', backgroundColor: '#100a18' },
+  topbarScroller: { flexGrow: 0, borderBottomWidth: 1, borderBottomColor: '#241536', backgroundColor: '#100a18' },
+  topbarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 7 },
   eyebrow: { color: rouColors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginBottom: 2 },
   bigMoney: { fontSize: 22 },
   theo: { color: rouColors.gold, fontSize: 13, fontWeight: '900', fontVariant: ['tabular-nums'] },
@@ -446,10 +453,13 @@ const styles = StyleSheet.create({
   stepButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   stepHint: { color: rouColors.muted, fontSize: 10, lineHeight: 15 },
   controls: { minHeight: 150, paddingHorizontal: 10, paddingVertical: 8, gap: 4, borderTopWidth: 1, borderTopColor: '#241536', backgroundColor: rouColors.panel },
+  controlsPhone: { minHeight: 0, paddingVertical: 4 },
+  spinButtonPhone: { minWidth: 96, minHeight: 46 },
   controlMain: { flex: 1, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   chipTray: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
+  chipTrayPhone: { width: '100%', justifyContent: 'center', gap: 4 },
   rollArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  message: { flex: 1, color: rouColors.muted, fontSize: 11 },
+  message: { flex: 1, minWidth: 0, color: rouColors.muted, fontSize: 11 },
   spinButton: { minWidth: 132, minHeight: 58 },
   automationBar: { minHeight: 34, width: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 5, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#2c1a45', paddingTop: 4 },
   watchLabel: { color: rouColors.muted, fontSize: 8, fontWeight: '900', letterSpacing: 1, marginLeft: 5 },
