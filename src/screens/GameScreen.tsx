@@ -64,7 +64,8 @@ interface ZoneProps {
 }
 
 function BetZone({ label, sublabel, amount = 0, stacks, onPress, active, compact, tone }: ZoneProps) {
-  const tight = useWindowDimensions().width < 900;
+  const { width, height } = useWindowDimensions();
+  const tight = width < 900 || (width > height && height < 520);
   const visibleStacks = stacks ?? [{ key: 'base', amount }];
   const numberZone = ['4', '5', '6', '8', '9', '10'].includes(label);
   return (
@@ -79,7 +80,8 @@ function BetZone({ label, sublabel, amount = 0, stacks, onPress, active, compact
 }
 
 function FieldZone({ amount, onPress }: { amount: number; onPress: () => void }) {
-  const tight = useWindowDimensions().width < 900;
+  const { width, height } = useWindowDimensions();
+  const tight = width < 900 || (width > height && height < 520);
   return (
     <View style={styles.zoneWrap}>
       <Pressable onPress={onPress} style={({ pressed }) => [styles.fieldZone, pressed && styles.pressedZone]}>
@@ -449,13 +451,17 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
     onChangeSettings({ ...settings, selectedChip: value });
   };
 
-  const { width: windowWidth } = useWindowDimensions();
-  const narrow = windowWidth < 900;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  // phone held sideways: keep the two-column table+panel layout but shrink all chrome to fit the short height
+  const shortLandscape = windowWidth > windowHeight && windowHeight < 520 && windowWidth < 1200;
+  const narrow = windowWidth < 900 && !shortLandscape;
   const phone = windowWidth < 500;
+  const compact = phone || shortLandscape;
   const BodyWrap = (narrow ? ScrollView : View) as typeof View;
   const SideWrap = (narrow ? View : ScrollView) as typeof ScrollView;
+  const RailWrap = (shortLandscape ? ScrollView : View) as typeof View;
 
-  const TopBar = ({ children }: { children: React.ReactNode }) => phone
+  const TopBar = ({ children }: { children: React.ReactNode }) => compact
     ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topbarScroller} contentContainerStyle={styles.topbarRow}>{children}</ScrollView>
     : <View style={styles.topbar}>{children}</View>;
 
@@ -481,8 +487,8 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
 
       <BodyWrap style={[styles.body, narrow && styles.bodyNarrow]}>
         <View style={[styles.tableColumn, narrow && styles.tableColumnNarrow]}>
-          <View style={[styles.tableRail, phone && styles.tableRailPhone]}>
-          <View style={[styles.felt, phone && styles.feltPhone]} onLayout={handleFeltLayout}>
+          <RailWrap style={[styles.tableRail, phone && styles.tableRailPhone, shortLandscape && styles.tableRailLow]}>
+          <View style={[styles.felt, phone && styles.feltPhone, shortLandscape && styles.feltLow]} onLayout={handleFeltLayout}>
             <View style={styles.feltWearOne} /><View style={styles.feltWearTwo} />
             <View style={styles.wallLabel}>
               <View style={styles.pyramidRail}>{Array.from({ length: 34 }, (_, index) => <View key={index} style={[styles.railPyramid, index % 2 === 0 && styles.railPyramidDim]} />)}</View>
@@ -537,15 +543,15 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
               />
             </Suspense> : null}
           </View>
-          </View>
+          </RailWrap>
 
-          <View style={[styles.controls, phone && styles.controlsPhone]}>
+          <View style={[styles.controls, compact && styles.controlsPhone]}>
             <View style={styles.controlMain}>
-            <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={phone} selected={chip === value} onPress={() => selectChip(value)} />)}</View>
-            {!phone ? (diceLocation === 'tray' ? <DiceResult faces={dice as [1 | 2 | 3 | 4 | 5 | 6, 1 | 2 | 3 | 4 | 5 | 6]} /> : <View style={styles.diceResultPlaceholder} />) : null}
+            <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={compact} selected={chip === value} onPress={() => selectChip(value)} />)}</View>
+            {!compact ? (diceLocation === 'tray' ? <DiceResult faces={dice as [1 | 2 | 3 | 4 | 5 | 6, 1 | 2 | 3 | 4 | 5 | 6]} /> : <View style={styles.diceResultPlaceholder} />) : null}
             <View style={styles.rollArea}>
               <Text style={[styles.message, rollBlockReason ? styles.blockReason : null]} numberOfLines={2}>{rollBlockReason || message}</Text>
-              <Button label={rolling ? 'ROLLING…' : 'ROLL DICE'} onPress={doRoll} disabled={!canRoll} style={[styles.rollButton, phone && styles.mainButtonPhone]} />
+              <Button label={rolling ? 'ROLLING…' : 'ROLL DICE'} onPress={doRoll} disabled={!canRoll} style={[styles.rollButton, compact && styles.mainButtonPhone]} />
             </View>
             </View>
             <View style={styles.automationBar}>
@@ -558,7 +564,7 @@ export function GameScreen({ strategies, selectedStrategyId, onSelectStrategy, s
           </View>
         </View>
 
-        <SideWrap style={[styles.sidePanel, narrow && styles.sidePanelNarrow, narrow && styles.sideContent]} contentContainerStyle={styles.sideContent}>
+        <SideWrap style={[styles.sidePanel, narrow && styles.sidePanelNarrow, narrow && styles.sideContent, shortLandscape && styles.sidePanelLow]} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={profitSeries} title="REALIZED P/L" pointLabel="Roll" palette={CHART_PALETTE} />
 
           <Text style={styles.panelSubtitle}>Roll history</Text>
@@ -684,6 +690,9 @@ const styles = StyleSheet.create({
   tableColumn: { flex: 1.75, minWidth: 600, minHeight: 0 },
   tableColumnNarrow: { flex: undefined, minWidth: 0 },
   tableRailPhone: { minHeight: 330, margin: 4, padding: 6, borderRadius: 22 },
+  tableRailLow: { minHeight: 240, margin: 3, padding: 4, borderRadius: 16 },
+  feltLow: { minHeight: 230, paddingTop: 30, paddingHorizontal: 6, paddingBottom: 5, borderRadius: 12 },
+  sidePanelLow: { minWidth: 260 },
   feltPhone: { minHeight: 314, paddingTop: 32, paddingHorizontal: 7, borderRadius: 16 },
   controlsPhone: { minHeight: 0, paddingVertical: 4 },
   mainButtonPhone: { minWidth: 96, minHeight: 46 },

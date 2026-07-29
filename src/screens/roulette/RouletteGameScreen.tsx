@@ -230,10 +230,13 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
     setMessage('New session ready. Place chips, then spin.');
   };
 
-  const { width: windowWidth } = useWindowDimensions();
-  const narrow = windowWidth < 900;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  // phone held sideways: keep the two-column table+panel layout but shrink all chrome to fit the short height
+  const shortLandscape = windowWidth > windowHeight && windowHeight < 520 && windowWidth < 1200;
+  const narrow = windowWidth < 900 && !shortLandscape;
   const phone = windowWidth < 500;
-  const TopBar = ({ children }: { children: React.ReactNode }) => phone
+  const compact = phone || shortLandscape;
+  const TopBar = ({ children }: { children: React.ReactNode }) => compact
     ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topbarScroller} contentContainerStyle={styles.topbarRow}>{children}</ScrollView>
     : <View style={styles.topbar}>{children}</View>;
 
@@ -263,7 +266,7 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
       <View style={[styles.body, narrow && styles.bodyNarrow]}>
         {!narrow || !showPanel ? <ScrollView style={[styles.tableColumn, narrow && styles.tableColumnNarrow]} contentContainerStyle={styles.tableContent}>
           <View style={styles.wheelRow}>
-            <RouletteWheel wheel={game.rules.wheel} trace={game.lastTrace} spinning={spinning} speed={speed} size={phone ? 168 : 210} />
+            <RouletteWheel wheel={game.rules.wheel} trace={game.lastTrace} spinning={spinning} speed={speed} size={compact ? 168 : 210} />
             <View style={styles.wheelSide}>
               <Text style={styles.wheelKind}>{wheelLabel}</Text>
               {game.lastPocket && !spinning ? <PocketBadge pocket={game.lastPocket} size={56} /> : null}
@@ -338,7 +341,7 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
           ) : null}
         </ScrollView> : null}
 
-        {showPanel ? <ScrollView style={[styles.sidePanel, narrow && styles.sidePanelNarrow]} contentContainerStyle={styles.sideContent}>
+        {showPanel ? <ScrollView style={[styles.sidePanel, narrow && styles.sidePanelNarrow, shortLandscape && styles.sidePanelLow]} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={game.profitSeries} title="SESSION P/L" pointLabel="Spin" palette={CHART_PALETTE} />
           {game.runners.length > 0 ? <Text style={styles.panelSubtitle}>Strategy runners</Text> : null}
           {game.runners.map((runner) => {
@@ -372,9 +375,9 @@ export function RouletteGameScreen({ settings }: { settings: RouletteSettings })
         </ScrollView> : null}
       </View>
 
-      <View style={[styles.controls, phone && styles.controlsPhone]}>
+      <View style={[styles.controls, compact && styles.controlsPhone]}>
         <View style={styles.controlMain}>
-          <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={phone} selected={chip === value} onPress={() => setChip(value)} />)}</View>
+          <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={compact} selected={chip === value} onPress={() => setChip(value)} />)}</View>
           <View style={styles.rollArea}>
             <Text style={styles.message} numberOfLines={2}>{message}</Text>
             <Button label="CLEAR" variant="ghost" onPress={() => setPendingBets({})} disabled={total === 0 || spinning} style={styles.violetGhost} />
@@ -469,6 +472,7 @@ const styles = StyleSheet.create({
   violetGhost: { borderColor: rouColors.border },
   sidePanel: { flex: 1, minWidth: 320, minHeight: 0, maxWidth: 480, borderLeftWidth: 1, borderLeftColor: '#241536', backgroundColor: rouColors.panel },
   sidePanelNarrow: { minWidth: 0, maxWidth: undefined, borderLeftWidth: 0 },
+  sidePanelLow: { minWidth: 260 },
   sideContent: { padding: 14, gap: 9 },
   panelSubtitle: { color: rouColors.ink, fontWeight: '900', fontSize: 14, marginTop: 7 },
   empty: { color: rouColors.muted, fontStyle: 'italic' },

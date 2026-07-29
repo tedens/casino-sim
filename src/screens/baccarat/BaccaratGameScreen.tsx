@@ -221,13 +221,17 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
   const recentRounds = game.history.slice(-10).reverse();
   const showHands = game.playerCards.length > 0 && pendingTotal === 0;
 
-  const { width: windowWidth } = useWindowDimensions();
-  const narrow = windowWidth < 900;
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  // phone held sideways: keep the two-column table+panel layout but shrink all chrome to fit the short height
+  const shortLandscape = windowWidth > windowHeight && windowHeight < 520 && windowWidth < 1200;
+  const narrow = windowWidth < 900 && !shortLandscape;
   const phone = windowWidth < 500;
+  const compact = phone || shortLandscape;
   const BodyWrap = (narrow ? ScrollView : View) as typeof View;
   const SideWrap = (narrow ? View : ScrollView) as typeof ScrollView;
+  const RailWrap = (shortLandscape ? ScrollView : View) as typeof View;
 
-  const TopBar = ({ children }: { children: React.ReactNode }) => phone
+  const TopBar = ({ children }: { children: React.ReactNode }) => compact
     ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.topbarScroller} contentContainerStyle={styles.topbarRow}>{children}</ScrollView>
     : <View style={styles.topbar}>{children}</View>;
 
@@ -246,8 +250,8 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
 
       <BodyWrap style={[styles.body, narrow && styles.bodyNarrow]}>
         {!narrow || !showPanel ? <View style={[styles.tableColumn, narrow && styles.tableColumnNarrow]}>
-          <View style={[styles.tableRail, phone && styles.tableRailPhone]}>
-            <View style={[styles.felt, phone && styles.feltPhone]}>
+          <RailWrap style={[styles.tableRail, phone && styles.tableRailPhone, shortLandscape && styles.tableRailLow]}>
+            <View style={[styles.felt, phone && styles.feltPhone, shortLandscape && styles.feltLow]}>
               <Text style={styles.rulesArc}>{rulesLine}</Text>
               <View style={styles.handsRow}>
                 <View style={styles.handBox}>
@@ -287,11 +291,11 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
               </View>
               <Text style={styles.feltBrand}>◆  BACCARAT STRATEGY LAB  ◆</Text>
             </View>
-          </View>
+          </RailWrap>
 
-          <View style={[styles.controls, phone && styles.controlsPhone]}>
+          <View style={[styles.controls, compact && styles.controlsPhone]}>
             <View style={styles.controlMain}>
-              <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={phone} selected={chip === value} onPress={() => setChip(value)} />)}</View>
+              <View style={[styles.chipTray, phone && styles.chipTrayPhone]}>{CHIP_VALUES.map((value) => <Chip key={value} value={value} small={compact} selected={chip === value} onPress={() => setChip(value)} />)}</View>
               <View style={styles.rollArea}>
                 <Text style={styles.message} numberOfLines={2}>{message}</Text>
                 <Button
@@ -324,7 +328,7 @@ export function BaccaratGameScreen({ settings, onChangeSettings }: {
           </View>
         </View> : null}
 
-        {showPanel ? <SideWrap style={[styles.sidePanel, narrow && styles.sidePanelNarrow, narrow && styles.sideContent]} contentContainerStyle={styles.sideContent}>
+        {showPanel ? <SideWrap style={[styles.sidePanel, narrow && styles.sidePanelNarrow, narrow && styles.sideContent, shortLandscape && styles.sidePanelLow]} contentContainerStyle={styles.sideContent}>
           <ProfitChart series={game.profitSeries} title="SESSION P/L" pointLabel="Coup" palette={CHART_PALETTE} />
           <BeadRoad road={game.beadRoad} shoeNumber={game.shoeNumber} />
           <Text style={styles.panelSubtitle}>Coup history</Text>
@@ -361,6 +365,9 @@ const styles = StyleSheet.create({
   tableColumn: { flex: 1.75, minWidth: 560, minHeight: 0 },
   tableColumnNarrow: { flex: undefined, minWidth: 0 },
   tableRailPhone: { minHeight: 320, margin: 4, padding: 6, borderRadius: 22 },
+  tableRailLow: { minHeight: 235, margin: 3, padding: 4, borderRadius: 16 },
+  feltLow: { minHeight: 225, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 12 },
+  sidePanelLow: { minWidth: 260 },
   feltPhone: { minHeight: 304, paddingHorizontal: 8, paddingVertical: 8, borderRadius: 16 },
   controlsPhone: { minHeight: 0, paddingVertical: 4 },
   tableRail: { flex: 1, minHeight: 400, margin: 7, padding: 9, borderRadius: 40, backgroundColor: '#241016', borderWidth: 2, borderColor: '#54262f', shadowColor: '#000', shadowOpacity: 0.8, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
